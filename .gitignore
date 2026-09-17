@@ -50,3 +50,9 @@ app.*.map.json
 TutorAI_reference_header_fix/
 
 TutorAI_reference_header_fix/
+
+# Local secrets
+backend/.env
+.env
+*.env
+

@@ -1103,11 +1103,16 @@ class _AskTutorAIScreenState extends State<AskTutorAIScreen> {
     String reply;
     if (backendReply != null && backendReply.trim().isNotEmpty) {
       reply = backendReply.trim();
+    } else if (_currentSolution == null) {
+      // Safe offline fallback: use the existing structured tutor engine only
+      // when the live AI service is unavailable. This preserves the working
+      // math tutor without pretending it is the general AI backend.
+      final solution = solveTutorQuestion(question);
+      if (!mounted) return;
+      _currentSolution = solution;
+      reply = _buildStandaloneLessonReply(solution);
     } else {
-      // Ask TutorAI is the general AI tutor. Never route a failed general-AI
-      // request into the specialist decimal/fraction engine.
-      reply =
-          'I could not reach the TutorAI AI service right now. Please try again in a moment.';
+      reply = _buildStandaloneFollowUp(question, _currentSolution!);
     }
 
     if (!mounted) return;
@@ -2005,21 +2010,18 @@ class TutorBackendClient {
     }
 
     final client = HttpClient();
-    client.connectionTimeout = const Duration(seconds: 15);
-    client.idleTimeout = const Duration(seconds: 120);
+    client.connectionTimeout = const Duration(seconds: 8);
+    client.idleTimeout = const Duration(seconds: 15);
 
-    Future<String?> attempt() async {
+    try {
       final uri = _uri('/v1/tutor/chat');
       debugPrint('TutorAI CHAT: POST $uri');
 
       final request = await client.postUrl(uri).timeout(
-        const Duration(seconds: 20),
+        const Duration(seconds: 10),
       );
-
       request.headers.contentType = ContentType.json;
       request.headers.set('Accept', 'application/json');
-      request.headers.set('Connection', 'close');
-
       request.write(jsonEncode({
         'question': question,
         'academicContext': context.toJson(),
@@ -2027,53 +2029,36 @@ class TutorBackendClient {
       }));
 
       final response = await request.close().timeout(
-        const Duration(seconds: 120),
+        const Duration(seconds: 30),
       );
-
       final body = await utf8.decoder.bind(response).join();
-
       debugPrint('TutorAI CHAT: HTTP ${response.statusCode}');
       debugPrint('TutorAI CHAT RESPONSE: $body');
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw HttpException(
-          'TutorAI backend returned HTTP ${response.statusCode}: $body',
-          uri: uri,
+        debugPrint(
+          'TutorAI CHAT ERROR: backend returned HTTP ${response.statusCode}',
         );
+        return null;
       }
 
       final decoded = jsonDecode(body);
-      if (decoded is! Map<String, dynamic>) {
-        throw const FormatException('TutorAI backend returned a non-object response.');
+      if (decoded is Map<String, dynamic>) {
+        final reply = decoded['reply'];
+        if (reply is String && reply.trim().isNotEmpty) {
+          debugPrint('TutorAI CHAT: real AI reply received.');
+          return reply.trim();
+        }
       }
 
-      final reply = decoded['reply'];
-      if (reply is String && reply.trim().isNotEmpty) {
-        debugPrint('TutorAI CHAT: real AI reply received.');
-        return reply.trim();
-      }
-
-      throw const FormatException(
-        'TutorAI backend response did not contain a usable reply.',
+      debugPrint(
+        'TutorAI CHAT ERROR: response did not contain a usable reply.',
       );
-    }
-
-    try {
-      return await attempt();
-    } catch (firstError, firstStackTrace) {
-      debugPrint('TutorAI CHAT FIRST ATTEMPT FAILED: $firstError');
-      debugPrint('$firstStackTrace');
-
-      // One retry handles transient Wi-Fi/phone connection interruptions.
-      await Future<void>.delayed(const Duration(milliseconds: 500));
-
-      try {
-        return await attempt();
-      } catch (secondError, secondStackTrace) {
-        debugPrint('TutorAI CHAT SECOND ATTEMPT FAILED: $secondError');
-        debugPrint('$secondStackTrace');
-        return null;
-      }
+      return null;
+    } catch (error, stackTrace) {
+      debugPrint('TutorAI CHAT CONNECTION ERROR: $error');
+      debugPrint('TutorAI CHAT STACK TRACE: $stackTrace');
+      return null;
     } finally {
       client.close(force: true);
     }
@@ -2186,14 +2171,102 @@ class TutorBackendClient {
 const TutorBackendClient _tutorBackend = TutorBackendClient();
 const TutorAcademicContext _defaultAcademicContext = TutorAcademicContext();
 
+bool _looksLikeMathQuestion(String question) {
+  final text = question.trim().toLowerCase();
+  if (text.isEmpty) return false;
+
+  // Clear mathematical structures should use the structured lesson endpoint.
+  if (RegExp(r'\d').hasMatch(text) &&
+      RegExp(r'[+\-*/%=]').hasMatch(text)) {
+    return true;
+  }
+
+  const mathSignals = <String>[
+    'solve for x',
+    'solve for y',
+    'find x',
+    'find y',
+    'simultaneous equation',
+    'linear equation',
+    'quadratic',
+    'equation',
+    'inequality',
+    'fraction',
+    'percentage',
+    'ratio',
+    'proportion',
+    'mean',
+    'average',
+    'probability',
+    'permutation',
+    'combination',
+    'algebra',
+    'geometry',
+    'trigonometry',
+    'calculus',
+    'derivative',
+    'differentiate',
+    'integral',
+    'integration',
+    'factorise',
+    'factorize',
+    'simplify',
+    'calculate',
+    'work out',
+    'show that',
+  ];
+
+  return mathSignals.any(text.contains);
+}
+
+TutorSolution _generalLearningSolution(String question, String reply) {
+  final cleanReply = reply.trim();
+  return TutorSolution(
+    question: question.trim(),
+    topic: 'General Learning',
+    steps: [
+      TutorStepData(
+        title: 'Explanation',
+        body: cleanReply,
+        why: 'TutorAI answers the exact subject and question the student asked, rather than forcing a mathematical method onto a non-mathematical question.',
+      ),
+    ],
+    answer: cleanReply,
+    methodSummary: 'TutorAI identified this as a general academic question and explained the topic directly at the student level.',
+    example: 'Ask: "Can you give me a simple example?" for a related example.',
+    supported: true,
+  );
+}
+
 Future<TutorSolution> solveTutorQuestionWithBackend(String question) async {
-  // Local first gives us a deterministic verification target and a guaranteed
-  // offline fallback. The secure backend can then improve/generalize the lesson.
+  // General academic questions must not fall back to the local math-only engine.
+  // They use the general TutorAI chat route, which supports subjects such as
+  // biology, chemistry, physics, English, economics and history.
+  if (!_looksLikeMathQuestion(question)) {
+    final reply = await _tutorBackend.askStandaloneChat(
+      question: question,
+      context: _defaultAcademicContext,
+      conversation: const <String>[],
+    );
+    if (reply != null && reply.trim().isNotEmpty) {
+      return _generalLearningSolution(question, reply);
+    }
+
+    // Never show a mathematical lesson for a non-mathematical question when
+    // the live AI service is unavailable.
+    return _generalLearningSolution(
+      question,
+      'TutorAI could not reach the live AI tutor right now. Please check the connection and try the question again.',
+    );
+  }
+
+  // Mathematical questions keep the structured lesson endpoint and its
+  // deterministic local verification/fallback.
   final local = solveTutorQuestion(question);
   final remote = await _tutorBackend.solve(
     question: question,
     context: _defaultAcademicContext,
-    localVerification: local,
+    localVerification: local.supported ? local : null,
   );
   return remote ?? local;
 }
