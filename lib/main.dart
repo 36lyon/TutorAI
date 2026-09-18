@@ -5,6 +5,8 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter_pdf_text/flutter_pdf_text.dart';
 
 void main() {
   runApp(const TutorAiApp());
@@ -572,17 +574,21 @@ class _FeatureStrip extends StatelessWidget {
                 data: cards[i],
                 onTap: i == 0
                     ? onSnap
-                    : i == 3
+                    : i == 2
                         ? () => Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const PracticeScreen()),
+                            MaterialPageRoute(builder: (_) => const StudyMyNotesScreen()),
                           )
-                        : () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => PlaceholderScreen(
-                              title: cards[i].title.replaceAll('\n', ' '),
-                            ),
-                          ),
-                        ),
+                        : i == 3
+                            ? () => Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => const PracticeScreen()),
+                              )
+                            : () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => PlaceholderScreen(
+                                    title: cards[i].title.replaceAll('\n', ' '),
+                                  ),
+                                ),
+                              ),
               ),
             ),
           ],
@@ -6275,6 +6281,580 @@ class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
   @override
   Widget build(BuildContext context) => const Center(child: Text('Profile', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900)));
+}
+
+
+class StudyMyNotesScreen extends StatefulWidget {
+  const StudyMyNotesScreen({super.key});
+
+  @override
+  State<StudyMyNotesScreen> createState() => _StudyMyNotesScreenState();
+}
+
+class _StudyMyNotesScreenState extends State<StudyMyNotesScreen> {
+  final TextEditingController _notesController = TextEditingController();
+
+  String _sourceName = '';
+  String _noteText = '';
+  String _aiOutput = '';
+  bool _busy = false;
+  String _status = '';
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickNotesFile() async {
+    if (_busy) return;
+
+    final file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: <String>['pdf', 'txt'],
+    );
+
+    if (file == null) return;
+
+    setState(() {
+      _busy = true;
+      _status = 'Reading ${file.name}...';
+      _aiOutput = '';
+    });
+
+    try {
+      String extracted;
+
+      if (file.extension?.toLowerCase() == 'txt') {
+        final bytes = await file.readAsBytes();
+        extracted = String.fromCharCodes(bytes);
+      } else {
+        final path = file.path;
+        if (path == null || path.isEmpty) {
+          throw Exception('The selected PDF path is unavailable.');
+        }
+        final doc = await PDFDoc.fromPath(path);
+        extracted = await doc.text;
+      }
+
+      extracted = extracted.trim();
+
+      if (extracted.isEmpty) {
+        throw Exception(
+          'No readable text was found. This can happen with a scanned or image-only PDF.',
+        );
+      }
+
+      setState(() {
+        _sourceName = file.name;
+        _noteText = extracted;
+        _notesController.text = extracted;
+        _status = 'Notes loaded successfully.';
+        _busy = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _status = 'Could not read this file.';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'TutorAI could not read this file. ${error.toString().replaceFirst('Exception: ', '')}',
+          ),
+        ),
+      );
+    }
+  }
+
+  void _useTypedNotes() {
+    final typed = _notesController.text.trim();
+    if (typed.isEmpty) {
+      setState(() => _status = 'Type or paste your notes first.');
+      return;
+    }
+
+    setState(() {
+      _sourceName = 'My typed notes';
+      _noteText = typed;
+      _aiOutput = '';
+      _status = 'Notes are ready for TutorAI.';
+    });
+  }
+
+  String _noteContext() {
+    final clean = _notesController.text.trim();
+    if (clean.isEmpty) return '';
+    const maxChars = 12000;
+    if (clean.length <= maxChars) return clean;
+    return '${clean.substring(0, maxChars)}\n\n[The remaining note text was omitted to keep the request focused.]';
+  }
+
+  Future<void> _askNotesAI(String task) async {
+    final notes = _noteContext();
+    if (notes.isEmpty || _busy) {
+      setState(() => _status = 'Add or upload notes first.');
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+      _status = 'TutorAI is working with your notes...';
+      _aiOutput = '';
+    });
+
+    final prompt = '''
+You are TutorAI, a patient school tutor.
+The student provided study notes below.
+
+TASK:
+$task
+
+RULES:
+- Use the notes as the primary source.
+- Do not invent facts that are not supported by the notes.
+- Explain at a school-student level using clear headings.
+- When the notes are incomplete, clearly say what is missing.
+- Do not merely give an answer; teach the idea.
+
+STUDENT NOTES:
+$notes
+''';
+
+    final reply = await _tutorBackend.askStandaloneChat(
+      question: prompt,
+      context: _defaultAcademicContext,
+      conversation: const <String>[],
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _busy = false;
+      _aiOutput = (reply == null || reply.trim().isEmpty)
+          ? 'TutorAI could not process these notes right now. Please try again.'
+          : reply.trim();
+      _status = 'Done.';
+    });
+  }
+
+  Future<void> _generateSummary() => _askNotesAI(
+        'Create a clear study summary. Start with the main ideas, then list important terms or facts, then give a short final recap.',
+      );
+
+  Future<void> _generateQuiz() => _askNotesAI(
+        'Create 5 school-level quiz questions from these notes. Put the questions first and then provide an answer key. Make sure every question is supported by the notes.',
+      );
+
+  Future<void> _explainSimply() => _askNotesAI(
+        'Explain the most important concept in these notes in very simple language, step by step, as though you are teaching a student who is struggling with the topic. Use a small example when the notes support one.',
+      );
+
+  Future<void> _createPractice() async {
+    final notes = _noteContext();
+    if (notes.isEmpty || _busy) {
+      setState(() => _status = 'Add or upload notes first.');
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+      _status = 'Creating a practice lesson...';
+      _aiOutput = '';
+    });
+
+    final prompt = '''
+Using only the study notes below, create one practice question for the student.
+Include:
+1. The question
+2. What the student should think about first
+3. A hidden-style answer explanation that teaches the method
+
+Do not make up content that is not supported by the notes.
+
+STUDENT NOTES:
+$notes
+''';
+
+    final reply = await _tutorBackend.askStandaloneChat(
+      question: prompt,
+      context: _defaultAcademicContext,
+      conversation: const <String>[],
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _busy = false;
+      _aiOutput = (reply == null || reply.trim().isEmpty)
+          ? 'TutorAI could not create practice from these notes right now.'
+          : reply.trim();
+      _status = 'Practice lesson ready.';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasNotes = _noteText.trim().isNotEmpty;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F9FF),
+      appBar: AppBar(
+        title: const Text('Study My Notes'),
+        centerTitle: true,
+        backgroundColor: Colors.white,
+      ),
+      body: SelectionArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF0F6A4D), Color(0xFF18A875)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x2918A875),
+                      blurRadius: 16,
+                      offset: Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Study from your notes',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            'Upload a PDF or text note, then let TutorAI summarize, explain, quiz, and create practice from what you provided.',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12.3,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Icon(
+                      Icons.auto_stories_rounded,
+                      color: Colors.white,
+                      size: 42,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _busy ? null : _pickNotesFile,
+                      icon: const Icon(Icons.upload_file_rounded),
+                      label: const Text('Upload PDF / TXT'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              const Row(
+                children: [
+                  Expanded(child: Divider()),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Text(
+                      'OR',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF7A8798),
+                      ),
+                    ),
+                  ),
+                  Expanded(child: Divider()),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFE0E8F3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Type or paste your notes',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF14213D),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _notesController,
+                      minLines: 8,
+                      maxLines: 16,
+                      onChanged: (value) => _noteText = value,
+                      decoration: InputDecoration(
+                        hintText: 'Paste your class notes here...',
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFD),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF18A875),
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: OutlinedButton.icon(
+                        onPressed: _busy ? null : _useTypedNotes,
+                        icon: const Icon(Icons.check_rounded),
+                        label: const Text('Use These Notes'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_status.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEAF8F2),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: [
+                      if (_busy)
+                        const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2.2),
+                        )
+                      else
+                        const Icon(
+                          Icons.info_outline_rounded,
+                          color: Color(0xFF16825A),
+                        ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Text(
+                          _status,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: Color(0xFF2F6C58),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (hasNotes) ...[
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFE0E8F3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.description_rounded,
+                            color: Color(0xFF18A875),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _sourceName.isEmpty ? 'Current notes' : _sourceName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF14213D),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 9),
+                      Text(
+                        '${_noteText.length} characters loaded',
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          color: Color(0xFF66758A),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        constraints: const BoxConstraints(maxHeight: 260),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFD),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: SingleChildScrollView(
+                          child: Text(
+                            _noteText,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              height: 1.5,
+                              color: Color(0xFF4E5F76),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Study tools',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF14213D),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 9,
+                  runSpacing: 9,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _busy ? null : _generateSummary,
+                      icon: const Icon(Icons.summarize_rounded, size: 18),
+                      label: const Text('Summarize'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : _explainSimply,
+                      icon: const Icon(Icons.psychology_rounded, size: 18),
+                      label: const Text('Explain Simply'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : _generateQuiz,
+                      icon: const Icon(Icons.quiz_rounded, size: 18),
+                      label: const Text('Quiz Me'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : _createPractice,
+                      icon: const Icon(Icons.edit_note_rounded, size: 18),
+                      label: const Text('Create Practice'),
+                    ),
+                  ],
+                ),
+              ],
+              if (_aiOutput.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x1022446B),
+                        blurRadius: 12,
+                        offset: Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(
+                            Icons.auto_awesome_rounded,
+                            color: Color(0xFF18A875),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'TutorAI',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF14213D),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        _aiOutput,
+                        style: const TextStyle(
+                          fontSize: 13.2,
+                          height: 1.5,
+                          color: Color(0xFF4F6077),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              const Text(
+                'Note: image-only or scanned PDFs may not contain selectable text. We can add page scanning/OCR as a later Notes improvement.',
+                style: TextStyle(
+                  fontSize: 10.8,
+                  height: 1.4,
+                  color: Color(0xFF718096),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class PlaceholderScreen extends StatelessWidget {
