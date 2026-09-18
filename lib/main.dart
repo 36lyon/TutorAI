@@ -4808,14 +4808,88 @@ class _PracticeScreenState extends State<PracticeScreen> {
     }
 
     final correct = _answersMatch(entered, question.answer);
+
     setState(() {
       _checked = true;
       _correct = correct;
-      _feedback = correct
-          ? 'Correct! ${question.explanation}'
-          : 'Not quite. The correct answer is ${question.answer}. ${question.explanation}';
+      _feedback = _buildPracticeFeedback(
+        question: question,
+        entered: entered,
+        correct: correct,
+      );
+
       if (correct) _score++;
     });
+  }
+
+  String _practiceConceptHint(_PracticeQuestion question) {
+    final topic = question.topic.toLowerCase();
+
+    if (topic.contains('algebra')) {
+      return 'Keep the equation balanced: whatever operation you use on one side must also be used on the other side.';
+    }
+
+    if (topic.contains('fraction')) {
+      return 'For addition and subtraction, make the denominators compatible before combining the fractions.';
+    }
+
+    if (topic.contains('percentage')) {
+      return 'Remember that a percentage is a part out of 100. Identify the whole before calculating the percentage of it.';
+    }
+
+    if (topic.contains('decimal')) {
+      return 'Line up the decimal points so that ones, tenths, hundredths, and other places stay in the correct columns.';
+    }
+
+    if (topic.contains('order of operations')) {
+      return 'Do multiplication and division before addition and subtraction, following the order of operations.';
+    }
+
+    if (topic.contains('biology')) {
+      return 'Focus on the function of the organ or biological process described in the question.';
+    }
+
+    if (topic.contains('physics')) {
+      return 'Match the question to the correct physical quantity, definition, unit, or law before choosing an answer.';
+    }
+
+    if (topic.contains('chemistry')) {
+      return 'Use the standard chemical symbol, definition, or property that matches the substance being asked about.';
+    }
+
+    if (topic.contains('grammar')) {
+      return 'Check subject-verb agreement and make sure the sentence structure matches standard English grammar.';
+    }
+
+    return 'Read the question again, identify exactly what it is asking, and compare your reasoning with the key idea.';
+  }
+
+  String _buildPracticeFeedback({
+    required _PracticeQuestion question,
+    required String entered,
+    required bool correct,
+  }) {
+    if (correct) {
+      return '✅ Correct!\n\n'
+          'Why your answer is correct:\n'
+          '${question.explanation}\n\n'
+          'Key idea:\n'
+          '${_practiceConceptHint(question)}\n\n'
+          'Keep it:\n'
+          'Before moving on, explain the key idea in your own words. That helps turn the answer into understanding.';
+    }
+
+    return '📘 Let’s learn from it.\n\n'
+        'Your answer:\n'
+        '$entered\n\n'
+        'Correct answer:\n'
+        '${question.answer}\n\n'
+        'What to learn:\n'
+        '${question.explanation}\n\n'
+        'Key idea:\n'
+        '${_practiceConceptHint(question)}\n\n'
+        'Next step:\n'
+        'Look at the key idea, work through the question again in your head, and identify the step where your reasoning changed direction.';
   }
 
   void _selectOption(String option) {
