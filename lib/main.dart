@@ -10,6 +10,76 @@ void main() {
   runApp(const TutorAiApp());
 }
 
+class _ProgressSession {
+  final String subject;
+  final int correct;
+  final int total;
+  final DateTime completedAt;
+
+  const _ProgressSession({
+    required this.subject,
+    required this.correct,
+    required this.total,
+    required this.completedAt,
+  });
+}
+
+class TutorProgressStore extends ChangeNotifier {
+  final List<_ProgressSession> _sessions = <_ProgressSession>[];
+
+  List<_ProgressSession> get sessions =>
+      List<_ProgressSession>.unmodifiable(_sessions);
+
+  int get totalQuestions =>
+      _sessions.fold<int>(0, (sum, session) => sum + session.total);
+
+  int get totalCorrect =>
+      _sessions.fold<int>(0, (sum, session) => sum + session.correct);
+
+  int get totalIncorrect => totalQuestions - totalCorrect;
+
+  int get practiceSessions => _sessions.length;
+
+  int get accuracy {
+    if (totalQuestions == 0) return 0;
+    return ((totalCorrect / totalQuestions) * 100).round();
+  }
+
+  Map<String, List<_ProgressSession>> get sessionsBySubject {
+    final grouped = <String, List<_ProgressSession>>{};
+
+    for (final session in _sessions) {
+      grouped.putIfAbsent(session.subject, () => <_ProgressSession>[]);
+      grouped[session.subject]!.add(session);
+    }
+
+    return grouped;
+  }
+
+  void recordPracticeSession({
+    required String subject,
+    required int correct,
+    required int total,
+  }) {
+    _sessions.add(
+      _ProgressSession(
+        subject: subject,
+        correct: correct,
+        total: total,
+        completedAt: DateTime.now(),
+      ),
+    );
+
+    notifyListeners();
+  }
+
+  void clear() {
+    _sessions.clear();
+    notifyListeners();
+  }
+}
+
+final TutorProgressStore tutorProgress = TutorProgressStore();
 class TutorAiApp extends StatelessWidget {
   const TutorAiApp({super.key});
 
@@ -4560,6 +4630,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
   bool _checked = false;
   bool _correct = false;
   bool _finished = false;
+  bool _progressRecorded = false;
   String _feedback = '';
 
   static const List<String> _subjects = <String>[
@@ -4756,6 +4827,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
       _checked = false;
       _correct = false;
       _finished = false;
+      _progressRecorded = false;
       _feedback = '';
       _answerController.clear();
     });
@@ -4902,7 +4974,18 @@ class _PracticeScreenState extends State<PracticeScreen> {
     if (!_checked) return;
 
     if (_questionIndex >= _questions.length - 1) {
-      setState(() => _finished = true);
+      if (!_progressRecorded) {
+        tutorProgress.recordPracticeSession(
+          subject: _selectedSubject ?? 'Practice',
+          correct: _score,
+          total: _questions.length,
+        );
+      }
+
+      setState(() {
+        _progressRecorded = true;
+        _finished = true;
+      });
       return;
     }
 
@@ -4924,6 +5007,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
       _checked = false;
       _correct = false;
       _finished = false;
+      _progressRecorded = false;
       _feedback = '';
       _answerController.clear();
     });
@@ -5242,8 +5326,447 @@ class _PracticeScreenState extends State<PracticeScreen> {
 
 class ProgressScreen extends StatelessWidget {
   const ProgressScreen({super.key});
+
   @override
-  Widget build(BuildContext context) => const Center(child: Text('Progress', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900)));
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: tutorProgress,
+      builder: (context, _) {
+        final totalQuestions = tutorProgress.totalQuestions;
+        final totalCorrect = tutorProgress.totalCorrect;
+        final totalIncorrect = tutorProgress.totalIncorrect;
+        final accuracy = tutorProgress.accuracy;
+        final practiceSessions = tutorProgress.practiceSessions;
+        final subjectGroups = tutorProgress.sessionsBySubject;
+
+        final recentSessions = tutorProgress.sessions.reversed.take(5).toList();
+
+        return Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFFF3F8FF),
+                Color(0xFFFBFDFF),
+              ],
+            ),
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Your Progress',
+                              style: TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'See how your practice is improving.',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE2EEFF),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(
+                          Icons.insights_rounded,
+                          color: Color(0xFF246BFD),
+                          size: 26,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      _ProgressStatCard(
+                        title: 'Questions',
+                        value: '$totalQuestions',
+                        icon: Icons.quiz_rounded,
+                        background: const Color(0xFFE2EEFF),
+                      ),
+                      _ProgressStatCard(
+                        title: 'Correct',
+                        value: '$totalCorrect',
+                        icon: Icons.check_circle_rounded,
+                        background: const Color(0xFFDDF8E8),
+                      ),
+                      _ProgressStatCard(
+                        title: 'Accuracy',
+                        value: '$accuracy%',
+                        icon: Icons.track_changes_rounded,
+                        background: const Color(0xFFFFEBCB),
+                      ),
+                      _ProgressStatCard(
+                        title: 'Sessions',
+                        value: '$practiceSessions',
+                        icon: Icons.history_rounded,
+                        background: const Color(0xFFFFE1F0),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 22),
+
+                  const Text(
+                    'Subject Progress',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  if (subjectGroups.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 58,
+                            height: 58,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE2EEFF),
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: const Icon(
+                              Icons.auto_graph_rounded,
+                              color: Color(0xFF246BFD),
+                              size: 30,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'No practice data yet',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Complete a practice session and your results will appear here.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    ...subjectGroups.entries.map((entry) {
+                      final sessions = entry.value;
+                      final total = sessions.fold<int>(
+                        0,
+                        (sum, session) => sum + session.total,
+                      );
+                      final correct = sessions.fold<int>(
+                        0,
+                        (sum, session) => sum + session.correct,
+                      );
+                      final subjectAccuracy =
+                          total == 0 ? 0 : ((correct / total) * 100).round();
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      entry.key,
+                                      style: const TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$subjectAccuracy%',
+                                    style: const TextStyle(
+                                      color: Color(0xFF246BFD),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: LinearProgressIndicator(
+                                  value: subjectAccuracy / 100,
+                                  minHeight: 9,
+                                  backgroundColor: const Color(0xFFEAF0F7),
+                                  valueColor:
+                                      const AlwaysStoppedAnimation<Color>(
+                                    Color(0xFF246BFD),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 9),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      '$correct correct out of $total questions',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '${sessions.length} session${sessions.length == 1 ? '' : 's'}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade600,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+
+                  const SizedBox(height: 12),
+
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Recent Practice',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      if (totalQuestions > 0)
+                        Text(
+                          '$totalIncorrect incorrect',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  if (recentSessions.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'Your completed practice sessions will appear here.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    )
+                  else
+                    ...recentSessions.map((session) {
+                      final percent = session.total == 0
+                          ? 0
+                          : ((session.correct / session.total) * 100).round();
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Container(
+                          padding: const EdgeInsets.all(15),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: percent >= 70
+                                      ? const Color(0xFFDDF8E8)
+                                      : const Color(0xFFFFEBCB),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Icon(
+                                  percent >= 70
+                                      ? Icons.check_rounded
+                                      : Icons.replay_rounded,
+                                  color: percent >= 70
+                                      ? const Color(0xFF18B76A)
+                                      : const Color(0xFFE39A00),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      session.subject,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      '${session.correct}/${session.total} correct',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Text(
+                                '$percent%',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ProgressStatCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color background;
+
+  const _ProgressStatCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.background,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 166,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: background,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                icon,
+                color: const Color(0xFF246BFD),
+                size: 21,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class ProfileScreen extends StatelessWidget {
@@ -5272,4 +5795,5 @@ class PlaceholderScreen extends StatelessWidget {
 }
 
 List<BoxShadow> _softShadow() => const [BoxShadow(color: Color(0x1A22446B), blurRadius: 18, offset: Offset(0, 7))];
+
 
