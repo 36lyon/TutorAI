@@ -4163,9 +4163,10 @@ The key idea is that the number did not randomly change. An extra whole was crea
     final solution = widget.solution;
     return Scaffold(
       appBar: AppBar(title: const Text('AI Tutor'), centerTitle: true),
-      body: ListView(
-        padding: const EdgeInsets.all(18),
-        children: [
+      body: SelectionArea(
+        child: ListView(
+          padding: const EdgeInsets.all(18),
+          children: [
           _ResultCard(
             title: 'Question',
             child: Text(solution.question, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, height: 1.35)),
@@ -4465,7 +4466,8 @@ The key idea is that the number did not randomly change. An extra whole was crea
               ),
             ],
           ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -4589,10 +4591,510 @@ String _masteryCheckForTopic(String topic) {
   return 'Can you solve a similar question without help and explain why each step is valid?';
 }
 
-class LearnScreen extends StatelessWidget {
+class _LearnTopicData {
+  final String title;
+  final String subtitle;
+  final String prompt;
+
+  const _LearnTopicData({
+    required this.title,
+    required this.subtitle,
+    required this.prompt,
+  });
+}
+
+class _LearnSubjectData {
+  final String name;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final List<_LearnTopicData> topics;
+
+  const _LearnSubjectData({
+    required this.name,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.topics,
+  });
+}
+
+class LearnScreen extends StatefulWidget {
   const LearnScreen({super.key});
+
   @override
-  Widget build(BuildContext context) => const Center(child: Text('Learn', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900)));
+  State<LearnScreen> createState() => _LearnScreenState();
+}
+
+class _LearnScreenState extends State<LearnScreen> {
+  static const List<_LearnSubjectData> _subjects = <_LearnSubjectData>[
+    _LearnSubjectData(
+      name: 'Mathematics',
+      subtitle: 'Numbers, algebra and problem solving',
+      icon: Icons.calculate_rounded,
+      color: Color(0xFF5B6FE8),
+      topics: <_LearnTopicData>[
+        _LearnTopicData(
+          title: 'Fractions',
+          subtitle: 'Start with adding fractions',
+          prompt: '1/2 + 1/4',
+        ),
+        _LearnTopicData(
+          title: 'Algebra',
+          subtitle: 'Learn to solve for x',
+          prompt: '2x + 5 = 15',
+        ),
+        _LearnTopicData(
+          title: 'Percentage',
+          subtitle: 'Find percentages step by step',
+          prompt: '20% of 150',
+        ),
+        _LearnTopicData(
+          title: 'Decimals',
+          subtitle: 'Add decimals correctly',
+          prompt: '4.50 + 2.25',
+        ),
+      ],
+    ),
+    _LearnSubjectData(
+      name: 'Science',
+      subtitle: 'Understand the world around you',
+      icon: Icons.science_rounded,
+      color: Color(0xFF18A875),
+      topics: <_LearnTopicData>[
+        _LearnTopicData(
+          title: 'Photosynthesis',
+          subtitle: 'How plants make food',
+          prompt: 'Explain photosynthesis simply for a school student.',
+        ),
+        _LearnTopicData(
+          title: 'Human Body',
+          subtitle: 'How the heart pumps blood',
+          prompt: 'Explain how the human heart pumps blood in simple terms.',
+        ),
+        _LearnTopicData(
+          title: 'States of Matter',
+          subtitle: 'Solids, liquids and gases',
+          prompt: 'Explain the three common states of matter with simple examples.',
+        ),
+        _LearnTopicData(
+          title: 'Energy',
+          subtitle: 'Kinetic and potential energy',
+          prompt: 'Explain kinetic and potential energy with simple examples.',
+        ),
+      ],
+    ),
+    _LearnSubjectData(
+      name: 'English',
+      subtitle: 'Grammar, vocabulary and comprehension',
+      icon: Icons.menu_book_rounded,
+      color: Color(0xFFE05274),
+      topics: <_LearnTopicData>[
+        _LearnTopicData(
+          title: 'Parts of Speech',
+          subtitle: 'Learn the main word classes',
+          prompt: 'Explain the main parts of speech with simple examples.',
+        ),
+        _LearnTopicData(
+          title: 'Tenses',
+          subtitle: 'Present, past and future',
+          prompt: 'Explain present, past, and future tense with simple examples.',
+        ),
+        _LearnTopicData(
+          title: 'Vocabulary',
+          subtitle: 'Build stronger word knowledge',
+          prompt: 'What does the word rapid mean? Give simple examples and a few similar words.',
+        ),
+        _LearnTopicData(
+          title: 'Comprehension',
+          subtitle: 'Find the main idea',
+          prompt: 'Teach me how to find the main idea in a comprehension passage.',
+        ),
+      ],
+    ),
+    _LearnSubjectData(
+      name: 'History',
+      subtitle: 'People, events and important ideas',
+      icon: Icons.account_balance_rounded,
+      color: Color(0xFFB2762C),
+      topics: <_LearnTopicData>[
+        _LearnTopicData(
+          title: 'African History',
+          subtitle: 'Learn events in context',
+          prompt: 'Teach me an introduction to African history in simple school-level language.',
+        ),
+        _LearnTopicData(
+          title: 'Important Events',
+          subtitle: 'Understand cause and effect',
+          prompt: 'Explain how historians use cause and effect to understand important events.',
+        ),
+      ],
+    ),
+    _LearnSubjectData(
+      name: 'Economics',
+      subtitle: 'Understand markets and everyday choices',
+      icon: Icons.trending_up_rounded,
+      color: Color(0xFF7A57C8),
+      topics: <_LearnTopicData>[
+        _LearnTopicData(
+          title: 'Demand and Supply',
+          subtitle: 'Understand the basic relationship',
+          prompt: 'Explain demand and supply with a simple everyday example.',
+        ),
+        _LearnTopicData(
+          title: 'Opportunity Cost',
+          subtitle: 'Understand the cost of a choice',
+          prompt: 'Explain opportunity cost with simple school-level examples.',
+        ),
+      ],
+    ),
+    _LearnSubjectData(
+      name: 'General Schoolwork',
+      subtitle: 'Study skills and school questions',
+      icon: Icons.auto_stories_rounded,
+      color: Color(0xFF2D75C7),
+      topics: <_LearnTopicData>[
+        _LearnTopicData(
+          title: 'Study Smarter',
+          subtitle: 'Build a useful study routine',
+          prompt: 'Teach me practical ways to study and remember what I learn.',
+        ),
+        _LearnTopicData(
+          title: 'Exam Preparation',
+          subtitle: 'Plan revision step by step',
+          prompt: 'Teach me how to prepare for an important school exam using a simple study plan.',
+        ),
+      ],
+    ),
+  ];
+
+  String _selectedSubject = 'Mathematics';
+  bool _startingLesson = false;
+
+  _LearnSubjectData get _selectedData =>
+      _subjects.firstWhere((subject) => subject.name == _selectedSubject);
+
+  Future<void> _startLesson(_LearnTopicData topic) async {
+    if (_startingLesson) return;
+
+    setState(() => _startingLesson = true);
+
+    final solution = await solveTutorQuestionWithBackend(topic.prompt);
+    if (!mounted) return;
+
+    setState(() => _startingLesson = false);
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => QuestionResultScreen(solution: solution),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final subject = _selectedData;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F9FF),
+      appBar: AppBar(
+        title: const Text('Learn'),
+        centerTitle: true,
+        backgroundColor: Colors.white,
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF123D82), Color(0xFF2D6CDF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x2A2563EB),
+                      blurRadius: 16,
+                      offset: Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Learn with TutorAI',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            'Choose a subject, pick a topic, and learn step by step with your AI tutor.',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12.5,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      height: 58,
+                      width: 58,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.16),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.menu_book_rounded,
+                        color: Colors.white,
+                        size: 30,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Choose a subject',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF14213D),
+                ),
+              ),
+              const SizedBox(height: 10),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _subjects.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: 1.55,
+                ),
+                itemBuilder: (context, index) {
+                  final item = _subjects[index];
+                  final selected = item.name == _selectedSubject;
+
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () => setState(() => _selectedSubject = item.name),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: selected
+                              ? item.color
+                              : const Color(0xFFE1E8F4),
+                          width: selected ? 1.7 : 1,
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x1022446B),
+                            blurRadius: 10,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            height: 42,
+                            width: 42,
+                            decoration: BoxDecoration(
+                              color: item.color.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(13),
+                            ),
+                            child: Icon(
+                              item.icon,
+                              color: item.color,
+                              size: 23,
+                            ),
+                          ),
+                          const SizedBox(width: 9),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.name,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF17243C),
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  item.subtitle,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 9.3,
+                                    height: 1.15,
+                                    color: Color(0xFF66758A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${subject.name} topics',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF14213D),
+                      ),
+                    ),
+                  ),
+                  if (_startingLesson)
+                    const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2.2),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ...subject.topics.map(
+                (topic) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Material(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(18),
+                      onTap: _startingLesson ? null : () => _startLesson(topic),
+                      child: Ink(
+                        padding: const EdgeInsets.fromLTRB(14, 13, 12, 13),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: const Color(0xFFE1E8F4),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              height: 44,
+                              width: 44,
+                              decoration: BoxDecoration(
+                                color: subject.color.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Icon(
+                                Icons.play_lesson_rounded,
+                                color: subject.color,
+                                size: 23,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    topic.title,
+                                    style: const TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF17243C),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    topic.subtitle,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 11.2,
+                                      color: Color(0xFF66758A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 16,
+                              color: subject.color,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAF2FF),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.auto_awesome_rounded,
+                      color: Color(0xFF2563EB),
+                      size: 22,
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Each topic opens the existing TutorAI lesson flow, where you can ask follow-up questions, request a simpler explanation, see another example, and practise what you learned.',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          height: 1.4,
+                          color: Color(0xFF4E6280),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class PracticeScreen extends StatefulWidget {
