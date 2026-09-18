@@ -502,7 +502,11 @@ class _FeatureStrip extends StatelessWidget {
                 data: cards[i],
                 onTap: i == 0
                     ? onSnap
-                    : () => Navigator.of(context).push(
+                    : i == 3
+                        ? () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const PracticeScreen()),
+                          )
+                        : () => Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => PlaceholderScreen(
                               title: cards[i].title.replaceAll('\n', ' '),
@@ -4521,10 +4525,645 @@ class LearnScreen extends StatelessWidget {
   Widget build(BuildContext context) => const Center(child: Text('Learn', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900)));
 }
 
-class PracticeScreen extends StatelessWidget {
+class PracticeScreen extends StatefulWidget {
   const PracticeScreen({super.key});
+
   @override
-  Widget build(BuildContext context) => const Center(child: Text('Practice', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900)));
+  State<PracticeScreen> createState() => _PracticeScreenState();
+}
+
+class _PracticeQuestion {
+  final String subject;
+  final String topic;
+  final String question;
+  final List<String>? options;
+  final String answer;
+  final String explanation;
+
+  const _PracticeQuestion({
+    required this.subject,
+    required this.topic,
+    required this.question,
+    required this.options,
+    required this.answer,
+    required this.explanation,
+  });
+}
+
+class _PracticeScreenState extends State<PracticeScreen> {
+  final TextEditingController _answerController = TextEditingController();
+
+  String? _selectedSubject;
+  List<_PracticeQuestion> _questions = const <_PracticeQuestion>[];
+  int _questionIndex = 0;
+  int _score = 0;
+  bool _checked = false;
+  bool _correct = false;
+  bool _finished = false;
+  String _feedback = '';
+
+  static const List<String> _subjects = <String>[
+    'Mathematics',
+    'Science',
+    'English',
+    'General Schoolwork',
+  ];
+
+  static const Map<String, List<_PracticeQuestion>> _questionBank = <String, List<_PracticeQuestion>>{
+    'Mathematics': <_PracticeQuestion>[
+      _PracticeQuestion(
+        subject: 'Mathematics',
+        topic: 'Algebra',
+        question: 'Solve: 2x + 6 = 14',
+        options: null,
+        answer: '4',
+        explanation: 'Subtract 6 from both sides to get 2x = 8, then divide both sides by 2. Therefore x = 4.',
+      ),
+      _PracticeQuestion(
+        subject: 'Mathematics',
+        topic: 'Fractions',
+        question: 'What is 1/2 + 1/4?',
+        options: <String>['1/4', '2/4', '3/4', '1'],
+        answer: '3/4',
+        explanation: 'Convert 1/2 to 2/4, then add 2/4 + 1/4 = 3/4.',
+      ),
+      _PracticeQuestion(
+        subject: 'Mathematics',
+        topic: 'Percentage',
+        question: 'What is 20% of 150?',
+        options: <String>['20', '25', '30', '35'],
+        answer: '30',
+        explanation: '20% means 20 ÷ 100. So 20/100 × 150 = 30.',
+      ),
+      _PracticeQuestion(
+        subject: 'Mathematics',
+        topic: 'Decimals',
+        question: 'Calculate: 4.50 + 2.25',
+        options: null,
+        answer: '6.75',
+        explanation: 'Align the decimal points and add the hundredths, tenths, and whole-number columns. The result is 6.75.',
+      ),
+      _PracticeQuestion(
+        subject: 'Mathematics',
+        topic: 'Order of Operations',
+        question: 'Calculate: 6 + 4 × 2',
+        options: <String>['14', '20', '16', '12'],
+        answer: '14',
+        explanation: 'Multiplication comes before addition, so 4 × 2 = 8, then 6 + 8 = 14.',
+      ),
+    ],
+    'Science': <_PracticeQuestion>[
+      _PracticeQuestion(
+        subject: 'Science',
+        topic: 'Biology',
+        question: 'Which organ pumps blood around the human body?',
+        options: <String>['Lungs', 'Heart', 'Kidney', 'Stomach'],
+        answer: 'Heart',
+        explanation: 'The heart is a muscular organ that pumps blood through the circulatory system.',
+      ),
+      _PracticeQuestion(
+        subject: 'Science',
+        topic: 'Biology',
+        question: 'What process do green plants use to make food using light?',
+        options: <String>['Respiration', 'Digestion', 'Photosynthesis', 'Filtration'],
+        answer: 'Photosynthesis',
+        explanation: 'Photosynthesis uses light energy to help plants make glucose from carbon dioxide and water.',
+      ),
+      _PracticeQuestion(
+        subject: 'Science',
+        topic: 'Physics',
+        question: 'What is the unit of force?',
+        options: <String>['Joule', 'Newton', 'Watt', 'Volt'],
+        answer: 'Newton',
+        explanation: 'Force is measured in newtons (N).',
+      ),
+      _PracticeQuestion(
+        subject: 'Science',
+        topic: 'Chemistry',
+        question: 'What is the chemical symbol for oxygen?',
+        options: <String>['O', 'Ox', 'C', 'H'],
+        answer: 'O',
+        explanation: 'The chemical symbol for oxygen is O.',
+      ),
+      _PracticeQuestion(
+        subject: 'Science',
+        topic: 'Physics',
+        question: 'Which form of energy is associated with moving objects?',
+        options: <String>['Kinetic energy', 'Chemical energy', 'Nuclear energy', 'Sound energy'],
+        answer: 'Kinetic energy',
+        explanation: 'Kinetic energy is the energy an object has because of its motion.',
+      ),
+    ],
+    'English': <_PracticeQuestion>[
+      _PracticeQuestion(
+        subject: 'English',
+        topic: 'Grammar',
+        question: 'Choose the correct sentence.',
+        options: <String>['She go to school every day.', 'She goes to school every day.', 'She going to school every day.', 'She gone to school every day.'],
+        answer: 'She goes to school every day.',
+        explanation: 'With the singular subject “She” in the simple present tense, the verb takes -s: “goes.”',
+      ),
+      _PracticeQuestion(
+        subject: 'English',
+        topic: 'Vocabulary',
+        question: 'What is the closest meaning of “rapid”?',
+        options: <String>['Slow', 'Quick', 'Quiet', 'Heavy'],
+        answer: 'Quick',
+        explanation: '“Rapid” means happening or moving quickly.',
+      ),
+      _PracticeQuestion(
+        subject: 'English',
+        topic: 'Parts of Speech',
+        question: 'In “The bright student smiled,” which word is the adjective?',
+        options: <String>['The', 'bright', 'student', 'smiled'],
+        answer: 'bright',
+        explanation: '“Bright” describes the noun “student,” so it is the adjective.',
+      ),
+      _PracticeQuestion(
+        subject: 'English',
+        topic: 'Grammar',
+        question: 'Choose the correct past tense of “write.”',
+        options: <String>['Writed', 'Written', 'Wrote', 'Writing'],
+        answer: 'Wrote',
+        explanation: 'The simple past tense of “write” is “wrote.” “Written” is the past participle.',
+      ),
+      _PracticeQuestion(
+        subject: 'English',
+        topic: 'Comprehension',
+        question: 'A main idea is best described as:',
+        options: <String>['A small detail', 'The central point', 'A difficult word', 'The final punctuation mark'],
+        answer: 'The central point',
+        explanation: 'The main idea is the central message or most important point of a passage.',
+      ),
+    ],
+    'General Schoolwork': <_PracticeQuestion>[
+      _PracticeQuestion(
+        subject: 'General Schoolwork',
+        topic: 'Geography',
+        question: 'Which planet is known as the Red Planet?',
+        options: <String>['Venus', 'Mars', 'Jupiter', 'Mercury'],
+        answer: 'Mars',
+        explanation: 'Mars is called the Red Planet because iron minerals on its surface create a reddish appearance.',
+      ),
+      _PracticeQuestion(
+        subject: 'General Schoolwork',
+        topic: 'History',
+        question: 'How many days are there in a leap year?',
+        options: <String>['364', '365', '366', '367'],
+        answer: '366',
+        explanation: 'A leap year has one extra day in February, giving a total of 366 days.',
+      ),
+      _PracticeQuestion(
+        subject: 'General Schoolwork',
+        topic: 'Study Skills',
+        question: 'Which action best helps you remember a new concept?',
+        options: <String>['Avoiding practice', 'Active recall', 'Only rereading once', 'Skipping difficult parts'],
+        answer: 'Active recall',
+        explanation: 'Active recall strengthens learning by making you retrieve information from memory instead of only rereading it.',
+      ),
+      _PracticeQuestion(
+        subject: 'General Schoolwork',
+        topic: 'Civics',
+        question: 'What is a constitution?',
+        options: <String>['A school timetable', 'A set of fundamental laws and principles', 'A weather report', 'A shopping list'],
+        answer: 'A set of fundamental laws and principles',
+        explanation: 'A constitution sets out fundamental rules, institutions, rights, and principles for a state.',
+      ),
+      _PracticeQuestion(
+        subject: 'General Schoolwork',
+        topic: 'Study Skills',
+        question: 'What should you do first when a question is unclear?',
+        options: <String>['Guess immediately', 'Ignore it', 'Identify exactly what is being asked', 'Copy another answer'],
+        answer: 'Identify exactly what is being asked',
+        explanation: 'Understanding the task first helps you choose the right method and avoid solving the wrong problem.',
+      ),
+    ],
+  };
+
+  @override
+  void dispose() {
+    _answerController.dispose();
+    super.dispose();
+  }
+
+  void _startPractice(String subject) {
+    final bank = _questionBank[subject] ?? const <_PracticeQuestion>[];
+    setState(() {
+      _selectedSubject = subject;
+      _questions = List<_PracticeQuestion>.from(bank);
+      _questionIndex = 0;
+      _score = 0;
+      _checked = false;
+      _correct = false;
+      _finished = false;
+      _feedback = '';
+      _answerController.clear();
+    });
+  }
+
+  _PracticeQuestion? get _currentQuestion {
+    if (_questionIndex < 0 || _questionIndex >= _questions.length) return null;
+    return _questions[_questionIndex];
+  }
+
+  bool _answersMatch(String entered, String expected) {
+    final cleanEntered = entered.trim().replaceAll('×', '*').replaceAll('÷', '/').replaceAll(',', '').replaceAll(' ', '').toLowerCase();
+    final cleanExpected = expected.trim().replaceAll('×', '*').replaceAll('÷', '/').replaceAll(',', '').replaceAll(' ', '').toLowerCase();
+    if (cleanEntered == cleanExpected) return true;
+
+    final enteredFraction = _parseFraction(cleanEntered);
+    final expectedFraction = _parseFraction(cleanExpected);
+    if (enteredFraction != null && expectedFraction != null) {
+      return enteredFraction.value == expectedFraction.value;
+    }
+
+    final enteredNumber = double.tryParse(cleanEntered);
+    final expectedNumber = double.tryParse(cleanExpected);
+    if (enteredNumber != null && expectedNumber != null) {
+      return (enteredNumber - expectedNumber).abs() < 1e-9;
+    }
+
+    return false;
+  }
+
+  _SimpleFraction? _parseFraction(String text) {
+    final match = RegExp(r'^(-?\d+)\/(\d+)$').firstMatch(text);
+    if (match == null) return null;
+    final numerator = int.tryParse(match.group(1)!);
+    final denominator = int.tryParse(match.group(2)!);
+    if (numerator == null || denominator == null || denominator == 0) return null;
+    return _SimpleFraction(numerator, denominator).normalized();
+  }
+
+  void _checkAnswer() {
+    final question = _currentQuestion;
+    if (question == null || _checked) return;
+
+    final entered = _answerController.text.trim();
+    if (entered.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter or select an answer first.')),
+      );
+      return;
+    }
+
+    final correct = _answersMatch(entered, question.answer);
+    setState(() {
+      _checked = true;
+      _correct = correct;
+      _feedback = correct
+          ? 'Correct! ${question.explanation}'
+          : 'Not quite. The correct answer is ${question.answer}. ${question.explanation}';
+      if (correct) _score++;
+    });
+  }
+
+  void _selectOption(String option) {
+    if (_checked) return;
+    _answerController.text = option;
+    setState(() {});
+  }
+
+  void _nextQuestion() {
+    if (!_checked) return;
+
+    if (_questionIndex >= _questions.length - 1) {
+      setState(() => _finished = true);
+      return;
+    }
+
+    setState(() {
+      _questionIndex++;
+      _checked = false;
+      _correct = false;
+      _feedback = '';
+      _answerController.clear();
+    });
+  }
+
+  void _resetToSubjects() {
+    setState(() {
+      _selectedSubject = null;
+      _questions = const <_PracticeQuestion>[];
+      _questionIndex = 0;
+      _score = 0;
+      _checked = false;
+      _correct = false;
+      _finished = false;
+      _feedback = '';
+      _answerController.clear();
+    });
+  }
+
+  void _restartPractice() {
+    final subject = _selectedSubject;
+    if (subject != null) _startPractice(subject);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_selectedSubject == null) return _buildSubjectPicker();
+    if (_finished) return _buildFinished();
+    return _buildQuestion();
+  }
+
+  Widget _buildSubjectPicker() {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F9FF),
+      appBar: AppBar(
+        title: const Text('Practice'),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 30),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFFE8F0FF), Color(0xFFF2ECFF)]),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: _softShadow(),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.auto_awesome_rounded, color: Color(0xFF2563EB), size: 28),
+                  SizedBox(height: 10),
+                  Text('Show what you understand', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF14213D))),
+                  SizedBox(height: 8),
+                  Text('Choose a subject and complete 5 questions. Check each answer before moving to the next one.', style: TextStyle(color: Color(0xFF52637A), height: 1.5)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text('Choose a subject', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF14213D))),
+            const SizedBox(height: 10),
+            for (final subject in _subjects) ...[
+              _practiceSubjectCard(subject),
+              const SizedBox(height: 12),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _practiceSubjectCard(String subject) {
+    final icons = <String, IconData>{
+      'Mathematics': Icons.calculate_rounded,
+      'Science': Icons.science_rounded,
+      'English': Icons.menu_book_rounded,
+      'General Schoolwork': Icons.school_rounded,
+    };
+    final colors = <String, Color>{
+      'Mathematics': const Color(0xFFE9E1FF),
+      'Science': const Color(0xFFE0F7ED),
+      'English': const Color(0xFFFFE4EC),
+      'General Schoolwork': const Color(0xFFE2EEFF),
+    };
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () => _startPractice(subject),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: _softShadow(),
+        ),
+        child: Row(
+          children: [
+            Container(
+              height: 50,
+              width: 50,
+              decoration: BoxDecoration(color: colors[subject], shape: BoxShape.circle),
+              child: Icon(icons[subject], color: const Color(0xFF2563EB), size: 25),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(subject, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF14213D))),
+                  const SizedBox(height: 4),
+                  const Text('5 questions • instant marking', style: TextStyle(color: Color(0xFF66758A), fontSize: 13)),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFF7B8BA1)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuestion() {
+    final question = _currentQuestion!;
+    final progress = (_questionIndex + 1) / _questions.length;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F9FF),
+      appBar: AppBar(
+        title: Text(question.subject),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        actions: [
+          IconButton(
+            tooltip: 'Choose another subject',
+            onPressed: _resetToSubjects,
+            icon: const Icon(Icons.swap_horiz_rounded),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 30),
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Question ${_questionIndex + 1} of ${_questions.length}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF14213D))),
+                ),
+                Text('${_score} correct', style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF2B775D))),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 9,
+                backgroundColor: const Color(0xFFE1EAF5),
+                valueColor: const AlwaysStoppedAnimation(Color(0xFF2563EB)),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: _softShadow()),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(color: const Color(0xFFE7F0FF), borderRadius: BorderRadius.circular(20)),
+                    child: Text(question.topic, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF2759A8))),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(question.question, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF14213D), height: 1.35)),
+                  const SizedBox(height: 18),
+                  if (question.options != null)
+                    for (final option in question.options!) ...[
+                      _optionButton(option),
+                      const SizedBox(height: 10),
+                    ]
+                  else
+                    TextField(
+                      controller: _answerController,
+                      enabled: !_checked,
+                      keyboardType: TextInputType.text,
+                      decoration: InputDecoration(
+                        hintText: 'Type your answer',
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFD),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFDDE6F2))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            if (!_checked)
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton.icon(
+                  onPressed: _checkAnswer,
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Check Answer'),
+                ),
+              ),
+            if (_checked) _buildFeedback(question),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _optionButton(String option) {
+    final selected = _answerController.text == option;
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => _selectOption(option),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFEAF2FF) : const Color(0xFFF8FAFD),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: selected ? const Color(0xFF2563EB) : const Color(0xFFDDE6F2), width: selected ? 1.6 : 1),
+        ),
+        child: Row(
+          children: [
+            Icon(selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: selected ? const Color(0xFF2563EB) : const Color(0xFF7C8EA6)),
+            const SizedBox(width: 12),
+            Expanded(child: Text(option, style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF24334B), height: 1.35))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeedback(_PracticeQuestion question) {
+    final background = _correct ? const Color(0xFFE1F8EA) : const Color(0xFFFFF1F1);
+    final foreground = _correct ? const Color(0xFF1B6B49) : const Color(0xFF9B3030);
+    return Container(
+      padding: const EdgeInsets.all(17),
+      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(20)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(_correct ? Icons.check_circle_rounded : Icons.info_rounded, color: foreground),
+              const SizedBox(width: 9),
+              Text(_correct ? 'Correct' : 'Let’s learn from it', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: foreground)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(_feedback, style: TextStyle(color: foreground, height: 1.5, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _nextQuestion,
+              icon: Icon(_questionIndex == _questions.length - 1 ? Icons.emoji_events_rounded : Icons.arrow_forward_rounded),
+              label: Text(_questionIndex == _questions.length - 1 ? 'See My Score' : 'Next Question'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFinished() {
+    final total = _questions.length;
+    final percent = total == 0 ? 0 : ((_score / total) * 100).round();
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F9FF),
+      appBar: AppBar(title: const Text('Practice Complete'), centerTitle: true, backgroundColor: Colors.transparent),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 30),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFFE7F0FF), Color(0xFFF1E8FF)]),
+                borderRadius: BorderRadius.circular(26),
+                boxShadow: _softShadow(),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.emoji_events_rounded, size: 58, color: Color(0xFF2563EB)),
+                  const SizedBox(height: 12),
+                  const Text('Practice complete!', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Color(0xFF14213D))),
+                  const SizedBox(height: 8),
+                  Text('$_score / $total correct', style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: Color(0xFF2563EB))),
+                  const SizedBox(height: 5),
+                  Text('$percent% • ${_selectedSubject ?? 'Practice'}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF52637A))),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: _softShadow()),
+              child: const Text('Use your score as a checkpoint, not a label. Review the questions you missed and try them again until the method feels clear.', style: TextStyle(color: Color(0xFF52637A), height: 1.5)),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(onPressed: _restartPractice, icon: const Icon(Icons.refresh_rounded), label: const Text('Try Again')),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: OutlinedButton.icon(onPressed: _resetToSubjects, icon: const Icon(Icons.swap_horiz_rounded), label: const Text('Choose Another Subject')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class ProgressScreen extends StatelessWidget {
@@ -4559,3 +5198,4 @@ class PlaceholderScreen extends StatelessWidget {
 }
 
 List<BoxShadow> _softShadow() => const [BoxShadow(color: Color(0x1A22446B), blurRadius: 18, offset: Offset(0, 7))];
+
