@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_pdf_text/flutter_pdf_text.dart';
+import 'package:speech_to_text/speech_to_text.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
 void main() {
   runApp(const TutorAiApp());
@@ -574,21 +576,25 @@ class _FeatureStrip extends StatelessWidget {
                 data: cards[i],
                 onTap: i == 0
                     ? onSnap
-                    : i == 2
+                    : i == 1
                         ? () => Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const StudyMyNotesScreen()),
+                            MaterialPageRoute(builder: (_) => const VoiceTutorScreen()),
                           )
-                        : i == 3
+                        : i == 2
                             ? () => Navigator.of(context).push(
-                                MaterialPageRoute(builder: (_) => const PracticeScreen()),
+                                MaterialPageRoute(builder: (_) => const StudyMyNotesScreen()),
                               )
-                            : () => Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => PlaceholderScreen(
-                                    title: cards[i].title.replaceAll('\n', ' '),
+                            : i == 3
+                                ? () => Navigator.of(context).push(
+                                    MaterialPageRoute(builder: (_) => const PracticeScreen()),
+                                  )
+                                : () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => PlaceholderScreen(
+                                        title: cards[i].title.replaceAll('\n', ' '),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
               ),
             ),
           ],
@@ -6283,6 +6289,456 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) => const Center(child: Text('Profile', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900)));
 }
 
+
+class VoiceTutorScreen extends StatefulWidget {
+  const VoiceTutorScreen({super.key});
+
+  @override
+  State<VoiceTutorScreen> createState() => _VoiceTutorScreenState();
+}
+
+class _VoiceTutorScreenState extends State<VoiceTutorScreen> {
+  final SpeechToText _speech = SpeechToText();
+  final FlutterTts _tts = FlutterTts();
+
+  bool _speechReady = false;
+  bool _isListening = false;
+  bool _busy = false;
+  bool _isSpeaking = false;
+  String _transcript = '';
+  String _reply = '';
+  String _status = 'Tap the microphone and speak your question.';
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeVoice();
+  }
+
+  Future<void> _initializeVoice() async {
+    try {
+      final ready = await _speech.initialize(
+        onStatus: (status) {
+          if (!mounted) return;
+          setState(() {
+            _isListening = status == 'listening';
+            if (!_isListening && !_busy && _transcript.trim().isNotEmpty) {
+              _status = 'Your question is ready. Tap Ask TutorAI.';
+            }
+          });
+        },
+        onError: (error) {
+          if (!mounted) return;
+          setState(() {
+            _isListening = false;
+            _status = 'Microphone error: ${error.errorMsg}';
+          });
+        },
+      );
+
+      await _tts.setLanguage('en-US');
+      await _tts.setSpeechRate(0.48);
+      await _tts.setVolume(1.0);
+      await _tts.setPitch(1.0);
+      await _tts.awaitSpeakCompletion(true);
+
+      if (!mounted) return;
+      setState(() {
+        _speechReady = ready;
+        if (!ready) {
+          _status = 'Speech recognition is not available on this device.';
+        }
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _speechReady = false;
+        _status = 'Voice setup could not be completed. Please try again.';
+      });
+      debugPrint('TutorAI VOICE INIT ERROR: $error');
+    }
+  }
+
+  Future<void> _toggleListening() async {
+    if (!_speechReady || _busy) return;
+
+    if (_isListening) {
+      await _speech.stop();
+      if (!mounted) return;
+      setState(() {
+        _isListening = false;
+        _status = _transcript.trim().isEmpty
+            ? 'No speech was captured. Tap the microphone and try again.'
+            : 'Your question is ready. Tap Ask TutorAI.';
+      });
+      return;
+    }
+
+    setState(() {
+      _transcript = '';
+      _reply = '';
+      _status = 'Listening... speak clearly.';
+    });
+
+    try {
+      await _speech.listen(
+        onResult: (result) {
+          if (!mounted) return;
+          setState(() {
+            _transcript = result.recognizedWords;
+            if (result.finalResult) {
+              _isListening = false;
+              _status = _transcript.trim().isEmpty
+                  ? 'No speech was captured. Try again.'
+                  : 'Your question is ready. Tap Ask TutorAI.';
+            }
+          });
+        },
+        listenOptions: SpeechListenOptions(
+          partialResults: true,
+          listenFor: Duration(seconds: 30),
+          pauseFor: Duration(seconds: 4),
+          listenMode: ListenMode.dictation,
+        ),
+      );
+      if (!mounted) return;
+      setState(() => _isListening = true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isListening = false;
+        _status = 'Could not start the microphone. Please try again.';
+      });
+      debugPrint('TutorAI VOICE LISTEN ERROR: $error');
+    }
+  }
+
+  Future<void> _askTutor() async {
+    final question = _transcript.trim();
+    if (question.isEmpty || _busy) {
+      setState(() => _status = 'Speak a question first.');
+      return;
+    }
+
+    if (_isListening) {
+      await _speech.stop();
+    }
+
+    setState(() {
+      _busy = true;
+      _reply = '';
+      _status = 'TutorAI is thinking...';
+    });
+
+    const promptPrefix = '''
+You are TutorAI, a patient school tutor speaking to a student.
+Answer the student's spoken question clearly and teach the idea rather than simply giving an answer.
+Use simple school-level language, show steps for maths or science when useful, and do not invent facts.
+Keep the response concise enough to be comfortable when read aloud.
+
+STUDENT SPOKEN QUESTION:
+''';
+
+    final reply = await _tutorBackend.askStandaloneChat(
+      question: '$promptPrefix$question',
+      context: _defaultAcademicContext,
+      conversation: const <String>[],
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _busy = false;
+      _reply = (reply == null || reply.trim().isEmpty)
+          ? 'TutorAI could not answer right now. Please try again.'
+          : reply.trim();
+      _status = reply == null || reply.trim().isEmpty
+          ? 'Please try again.'
+          : 'TutorAI answered your question.';
+    });
+
+    if (reply != null && reply.trim().isNotEmpty) {
+      await _speak(reply.trim());
+    }
+  }
+
+  Future<void> _speak(String text) async {
+    try {
+      if (_isSpeaking) {
+        await _tts.stop();
+      }
+      if (!mounted) return;
+      setState(() => _isSpeaking = true);
+      await _tts.speak(text);
+    } catch (error) {
+      debugPrint('TutorAI TTS ERROR: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _isSpeaking = false);
+      }
+    }
+  }
+
+  Future<void> _stopSpeaking() async {
+    await _tts.stop();
+    if (!mounted) return;
+    setState(() => _isSpeaking = false);
+  }
+
+  Future<void> _clear() async {
+    await _stopSpeaking();
+    if (!mounted) return;
+    setState(() {
+      _transcript = '';
+      _reply = '';
+      _status = 'Tap the microphone and speak your question.';
+    });
+  }
+
+  @override
+  void dispose() {
+    _speech.stop();
+    _tts.stop();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F9FF),
+      appBar: AppBar(
+        title: const Text('Ask by Voice'),
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF14213D),
+        elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Clear',
+            onPressed: _busy ? null : _clear,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: SelectionArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFEAF2FF), Color(0xFFF4EAFF)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x1422446B),
+                        blurRadius: 16,
+                        offset: Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 110,
+                        height: 110,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _isListening
+                              ? const Color(0xFFFFE0EA)
+                              : const Color(0xFFDDEAFF),
+                        ),
+                        child: Icon(
+                          _isListening
+                              ? Icons.mic_rounded
+                              : Icons.record_voice_over_rounded,
+                          size: 58,
+                          color: _isListening
+                              ? const Color(0xFFE83E72)
+                              : const Color(0xFF2563EB),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Ask TutorAI by voice',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF14213D),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _speechReady
+                            ? 'Speak naturally. TutorAI will turn your speech into a question and answer it.'
+                            : 'Preparing speech recognition on your device...',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          height: 1.45,
+                          color: Color(0xFF52637A),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: (!_speechReady || _busy)
+                              ? null
+                              : _toggleListening,
+                          icon: Icon(
+                            _isListening
+                                ? Icons.stop_rounded
+                                : Icons.mic_rounded,
+                          ),
+                          label: Text(
+                            _isListening ? 'Stop Listening' : 'Start Listening',
+                          ),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(52),
+                            backgroundColor: const Color(0xFF2563EB),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _voiceSectionCard(
+                  title: 'Your question',
+                  icon: Icons.record_voice_over_rounded,
+                  child: Text(
+                    _transcript.isEmpty
+                        ? 'Your spoken question will appear here.'
+                        : _transcript,
+                    style: TextStyle(
+                      fontSize: 16,
+                      height: 1.5,
+                      color: _transcript.isEmpty
+                          ? const Color(0xFF7B8798)
+                          : const Color(0xFF14213D),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: (_transcript.trim().isEmpty || _busy || _isListening)
+                        ? null
+                        : _askTutor,
+                    icon: const Icon(Icons.auto_awesome_rounded),
+                    label: const Text('Ask TutorAI'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(50),
+                      backgroundColor: const Color(0xFF123B7A),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _status,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF52637A),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (_reply.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  _voiceSectionCard(
+                    title: 'TutorAI answer',
+                    icon: Icons.smart_toy_rounded,
+                    trailing: _isSpeaking
+                        ? IconButton(
+                            tooltip: 'Stop speaking',
+                            onPressed: _stopSpeaking,
+                            icon: const Icon(Icons.stop_circle_rounded),
+                          )
+                        : IconButton(
+                            tooltip: 'Read aloud',
+                            onPressed: () => _speak(_reply),
+                            icon: const Icon(Icons.volume_up_rounded),
+                          ),
+                    child: Text(
+                      _reply,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        height: 1.55,
+                        color: Color(0xFF14213D),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _voiceSectionCard({
+    required String title,
+    required IconData icon,
+    required Widget child,
+    Widget? trailing,
+  }) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1022446B),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: const Color(0xFF2563EB)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF14213D),
+                  ),
+                ),
+              ),
+              if (trailing != null) trailing,
+            ],
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+}
 
 class StudyMyNotesScreen extends StatefulWidget {
   const StudyMyNotesScreen({super.key});
