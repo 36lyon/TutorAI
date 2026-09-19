@@ -6,27 +6,54 @@ const port = Number(process.env.PORT || 8787);
 // TUTOR AI CONFIGURATION
 // ============================================================
 
-// Primary provider.
-// Use "openai" for the smart cloud tutor.
-// Use "ollama" for local-only operation.
-const aiProvider = (process.env.AI_PROVIDER || 'openai').toLowerCase();
+// TutorAI runs in cost-aware AUTO mode by default:
+// - Gemini 2.5 Flash-Lite handles normal, high-volume student work.
+// - DeepSeek V4.1 Flash handles harder reasoning when a DeepSeek key is configured.
+// - Ollama remains an optional local fallback and is OFF unless explicitly enabled.
+//
+// Backward compatibility:
+// The existing OPENAI_* variables are still accepted where they were previously
+// used for the Gemini OpenAI-compatible endpoint. New deployments should use
+// GEMINI_* and DEEPSEEK_* names instead.
+const rawAiProvider = (process.env.AI_PROVIDER || 'auto').toLowerCase();
+const aiProvider = rawAiProvider === 'openai' ? 'auto' : rawAiProvider;
 
-// Fall back to Ollama if the cloud provider is unavailable.
+const aiFallbackToDeepSeek = process.env.AI_FALLBACK_TO_DEEPSEEK !== 'false';
 const aiFallbackToOllama = process.env.AI_FALLBACK_TO_OLLAMA !== 'false';
 
 // -------------------------
-// OpenAI
+// Google Gemini
 // -------------------------
 
-const openAiBaseUrl = (
-  process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'
+const legacyOpenAiBaseUrl = (process.env.OPENAI_BASE_URL || '').trim();
+const defaultGeminiBaseUrl = 'https://generativelanguage.googleapis.com/v1beta/openai';
+
+const geminiBaseUrl = (
+  process.env.GEMINI_BASE_URL ||
+  (legacyOpenAiBaseUrl.includes('generativelanguage.googleapis.com')
+    ? legacyOpenAiBaseUrl
+    : defaultGeminiBaseUrl)
 ).replace(/\/+$/, '');
 
-const openAiApiKey = process.env.OPENAI_API_KEY || '';
+const geminiApiKey =
+  process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || '';
 
-const openAiModel = process.env.OPENAI_MODEL || 'gpt-5.4-mini';
-const openAiSimpleModel =
-  process.env.OPENAI_SIMPLE_MODEL || 'gpt-5.4-nano';
+// Cost-first default. Set GEMINI_MODEL explicitly only when you intentionally
+// want a different Gemini model.
+const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+const geminiSimpleModel =
+  process.env.GEMINI_SIMPLE_MODEL || 'gemini-2.5-flash-lite';
+
+// -------------------------
+// DeepSeek
+// -------------------------
+
+const deepSeekBaseUrl = (
+  process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com'
+).replace(/\/+$/, '');
+
+const deepSeekApiKey = process.env.DEEPSEEK_API_KEY || '';
+const deepSeekModel = process.env.DEEPSEEK_MODEL || 'deepseek-flash';
 
 // -------------------------
 // Ollama fallback
@@ -81,7 +108,7 @@ function normalizeText(value) {
 }
 
 // ============================================================
-// SMART MODEL ROUTING
+// SMART COST-AWARE MODEL ROUTING
 // ============================================================
 
 function isGenuinelySimpleChat(question) {
@@ -138,7 +165,7 @@ function isFastFollowUp(question) {
     return false;
   }
 
-  // Keep calculations and other multi-step reasoning on the main model.
+  // Keep calculations and other multi-step reasoning off the lightweight lane.
   if (needsDeeperReasoning(text)) {
     return false;
   }
@@ -148,6 +175,44 @@ function isFastFollowUp(question) {
   );
 }
 
+function geminiRoute({ purpose, question }) {
+  const simple = purpose === 'follow-up' && isFastFollowUp(question);
+
+  return {
+    provider: 'gemini',
+    model: simple ? geminiSimpleModel : geminiModel,
+    reasoningEffort: 'low',
+    maxOutputTokens:
+      purpose === 'tutor'
+        ? 1600
+        : purpose === 'follow-up'
+          ? simple
+            ? 300
+            : 500
+          : purpose === 'chat'
+            ? 900
+            : 900,
+    responseFormat: purpose === 'tutor' ? 'tutor-lesson' : null,
+  };
+}
+
+function deepSeekRoute({ purpose, question }) {
+  const hard = needsDeeperReasoning(question);
+
+  return {
+    provider: 'deepseek',
+    model: deepSeekModel,
+    reasoningEffort: hard ? 'high' : 'low',
+    maxOutputTokens:
+      purpose === 'tutor'
+        ? 1600
+        : purpose === 'follow-up'
+          ? 500
+          : 900,
+    responseFormat: purpose === 'tutor' ? 'tutor-lesson-json' : null,
+  };
+}
+
 function chooseAiRoute({ purpose, question }) {
   // Explicit local-only mode.
   if (aiProvider === 'ollama') {
@@ -155,57 +220,28 @@ function chooseAiRoute({ purpose, question }) {
       provider: 'ollama',
       model: ollamaModel,
       reasoningEffort: null,
-      maxOutputTokens: purpose === 'tutor' ? 1600 : 1000,
+      maxOutputTokens: purpose === 'tutor' ? 1600 : 900,
+      responseFormat: null,
     };
   }
 
-  // Actual lessons always use the main teaching model.
-  if (purpose === 'tutor') {
-    return {
-      provider: 'openai',
-      model: openAiModel,
-      reasoningEffort: needsDeeperReasoning(question) ? 'medium' : 'low',
-      maxOutputTokens: 1600,
-      responseFormat: 'tutor-lesson',
-    };
+  // Explicit provider overrides are useful for diagnostics/testing.
+  if (aiProvider === 'gemini') {
+    return geminiRoute({ purpose, question });
   }
 
-  // Fast, simple follow-ups use the low-latency model.
-  // Difficult follow-ups stay on the main teaching model.
-  if (purpose === 'follow-up') {
-    if (isFastFollowUp(question)) {
-      return {
-        provider: 'openai',
-        model: openAiSimpleModel,
-        reasoningEffort: 'low',
-        maxOutputTokens: 300,
-      };
-    }
-
-    return {
-      provider: 'openai',
-      model: openAiModel,
-      reasoningEffort: needsDeeperReasoning(question) ? 'medium' : 'low',
-      maxOutputTokens: 500,
-    };
+  if (aiProvider === 'deepseek') {
+    return deepSeekRoute({ purpose, question });
   }
 
-  // Only trivial greetings/simple chat use the lower-cost model.
-  if (purpose === 'chat' && isGenuinelySimpleChat(question)) {
-    return {
-      provider: 'openai',
-      model: openAiSimpleModel,
-      reasoningEffort: 'low',
-      maxOutputTokens: 500,
-    };
+  // AUTO MODE:
+  // Normal high-volume work stays on the cheapest Gemini Flash-Lite lane.
+  // Hard reasoning uses DeepSeek V4.1-Flash when configured.
+  if (needsDeeperReasoning(question) && aiFallbackToDeepSeek && deepSeekApiKey) {
+    return deepSeekRoute({ purpose, question });
   }
 
-  return {
-    provider: 'openai',
-    model: openAiModel,
-    reasoningEffort: needsDeeperReasoning(question) ? 'medium' : 'low',
-    maxOutputTokens: 900,
-  };
+  return geminiRoute({ purpose, question });
 }
 
 // ============================================================
@@ -363,29 +399,54 @@ function buildChatUserPrompt(body) {
 }
 
 // ============================================================
-// OPENAI
+// OPENAI-COMPATIBLE CLOUD PROVIDERS
 // ============================================================
 
-async function callOpenAi(messages, route) {
-  if (!openAiApiKey) {
-    throw new Error('OPENAI_API_KEY is not configured.');
+function providerConfig(provider) {
+  if (provider === 'gemini') {
+    return {
+      baseUrl: geminiBaseUrl,
+      apiKey: geminiApiKey,
+      errorName: 'Gemini',
+    };
+  }
+
+  if (provider === 'deepseek') {
+    return {
+      baseUrl: deepSeekBaseUrl,
+      apiKey: deepSeekApiKey,
+      errorName: 'DeepSeek',
+    };
+  }
+
+  throw new Error(`Unsupported cloud provider: ${provider}`);
+}
+
+async function callOpenAiCompatible(messages, route) {
+  const config = providerConfig(route.provider);
+
+  if (!config.apiKey) {
+    throw new Error(`${config.errorName} API key is not configured.`);
   }
 
   const payload = {
     model: route.model,
     messages,
-    max_completion_tokens: route.maxOutputTokens,
   };
 
-  // Gemini's OpenAI-compatible endpoint supports reasoning_effort.
-  // Keep it only where a route explicitly requests it.
+  // Gemini's OpenAI-compatible endpoint accepts max_completion_tokens.
+  // DeepSeek's Chat Completions endpoint uses max_tokens.
+  if (route.provider === 'deepseek') {
+    payload.max_tokens = route.maxOutputTokens;
+  } else {
+    payload.max_completion_tokens = route.maxOutputTokens;
+  }
+
   if (route.reasoningEffort) {
     payload.reasoning_effort = route.reasoningEffort;
   }
 
-  // The Tutor lesson endpoint must return the exact object consumed by
-  // the Flutter app. Gemini structured output enforces the schema at the
-  // model boundary instead of relying on prompt-only JSON instructions.
+  // Tutor lessons must return the exact object consumed by Flutter.
   if (route.responseFormat === 'tutor-lesson') {
     payload.response_format = {
       type: 'json_schema',
@@ -395,13 +456,18 @@ async function callOpenAi(messages, route) {
         schema: tutorLessonSchema,
       },
     };
+  } else if (route.responseFormat === 'tutor-lesson-json') {
+    // DeepSeek currently guarantees valid JSON through json_object mode.
+    payload.response_format = {
+      type: 'json_object',
+    };
   }
 
-  const response = await fetch(`${openAiBaseUrl}/chat/completions`, {
+  const response = await fetch(`${config.baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      authorization: `Bearer ${openAiApiKey}`,
+      authorization: `Bearer ${config.apiKey}`,
     },
     body: JSON.stringify(payload),
   });
@@ -409,7 +475,7 @@ async function callOpenAi(messages, route) {
   const raw = await response.text();
 
   if (!response.ok) {
-    throw new Error(`OpenAI ${response.status}: ${raw.slice(0, 700)}`);
+    throw new Error(`${config.errorName} ${response.status}: ${raw.slice(0, 700)}`);
   }
 
   let data;
@@ -417,18 +483,18 @@ async function callOpenAi(messages, route) {
   try {
     data = JSON.parse(raw);
   } catch (error) {
-    throw new Error(`OpenAI returned invalid JSON: ${error.message}`);
+    throw new Error(`${config.errorName} returned invalid JSON: ${error.message}`);
   }
 
   const content = data?.choices?.[0]?.message?.content;
 
   if (typeof content !== 'string' || !content.trim()) {
-    throw new Error('OpenAI returned no message content.');
+    throw new Error(`${config.errorName} returned no message content.`);
   }
 
   return {
     content: content.trim(),
-    provider: 'openai',
+    provider: route.provider,
     model: route.model,
   };
 }
@@ -488,14 +554,49 @@ async function callAi(messages, route) {
   }
 
   try {
-    return await callOpenAi(messages, route);
-  } catch (openAiError) {
+    return await callOpenAiCompatible(messages, route);
+  } catch (primaryError) {
+    // In AUTO mode, retry a cloud request on the other configured provider.
+    if (aiProvider === 'auto') {
+      const fallbackProvider =
+        route.provider === 'gemini' ? 'deepseek' : 'gemini';
+
+      const fallbackKeyPresent =
+        fallbackProvider === 'gemini' ? Boolean(geminiApiKey) : Boolean(deepSeekApiKey);
+
+      const fallbackAllowed =
+        fallbackProvider === 'deepseek' ? aiFallbackToDeepSeek : true;
+
+      if (fallbackAllowed && fallbackKeyPresent) {
+        console.warn(
+          `${route.provider} failed; trying ${fallbackProvider}: ${primaryError.message}`,
+        );
+
+        const fallbackRoute =
+          fallbackProvider === 'gemini'
+            ? geminiRoute({
+                purpose: route.responseFormat ? 'tutor' : 'chat',
+                question: '',
+              })
+            : deepSeekRoute({
+                purpose: route.responseFormat ? 'tutor' : 'chat',
+                question: '',
+              });
+
+        // Preserve the original output budget/format for fallback calls.
+        fallbackRoute.maxOutputTokens = route.maxOutputTokens;
+        fallbackRoute.reasoningEffort = route.reasoningEffort;
+
+        return callOpenAiCompatible(messages, fallbackRoute);
+      }
+    }
+
     if (!aiFallbackToOllama) {
-      throw openAiError;
+      throw primaryError;
     }
 
     console.warn(
-      `OpenAI failed; using Ollama fallback: ${openAiError.message}`,
+      `${route.provider} failed; using Ollama fallback: ${primaryError.message}`,
     );
 
     return callOllama(messages, {
@@ -503,6 +604,7 @@ async function callAi(messages, route) {
       model: ollamaModel,
       reasoningEffort: null,
       maxOutputTokens: route.maxOutputTokens,
+      responseFormat: null,
     });
   }
 }
@@ -746,8 +848,12 @@ const server = http.createServer(async (req, res) => {
         ok: true,
         service: 'TutorAI backend',
         configuredProvider: aiProvider,
-        primaryModel: openAiModel,
-        simpleModel: openAiSimpleModel,
+        geminiConfigured: Boolean(geminiApiKey),
+        geminiModel,
+        geminiSimpleModel,
+        deepSeekConfigured: Boolean(deepSeekApiKey),
+        deepSeekModel,
+        fallbackToDeepSeek: aiFallbackToDeepSeek,
         ollamaModel,
         fallbackToOllama: aiFallbackToOllama,
       });
@@ -791,9 +897,13 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(port, '0.0.0.0', () => {
   console.log(`TutorAI backend listening on http://0.0.0.0:${port}`);
-  console.log(`Configured provider: ${aiProvider}`);
-  console.log(`Primary model: ${openAiModel}`);
-  console.log(`Simple model: ${openAiSimpleModel}`);
+  console.log(`Configured provider mode: ${aiProvider}`);
+  console.log(`Gemini configured: ${Boolean(geminiApiKey)}`);
+  console.log(`Gemini model: ${geminiModel}`);
+  console.log(`Gemini simple model: ${geminiSimpleModel}`);
+  console.log(`DeepSeek configured: ${Boolean(deepSeekApiKey)}`);
+  console.log(`DeepSeek model: ${deepSeekModel}`);
+  console.log(`DeepSeek fallback enabled: ${aiFallbackToDeepSeek}`);
   console.log(`Ollama fallback enabled: ${aiFallbackToOllama}`);
   console.log(`Ollama fallback model: ${ollamaModel}`);
 });
