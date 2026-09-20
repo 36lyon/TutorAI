@@ -228,7 +228,16 @@ class HomeScreen extends StatelessWidget {
                       _RecommendationData(Icons.lightbulb_rounded, 'Daily Learning', 'New topic for you', Color(0xFFFFE1F0)),
                       _RecommendationData(Icons.emoji_events_rounded, 'Achievements', 'Earn badges & rewards', Color(0xFFDDF8E8)),
                     ];
-                    return _RecommendationCard(data: items[index]);
+                    return _RecommendationCard(
+                      data: items[index],
+                      onTap: index == 1
+                          ? () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const ExamPrepScreen(),
+                              ),
+                            )
+                          : null,
+                    );
                   },
                 ),
               ),
@@ -1104,35 +1113,63 @@ class _RecommendationData {
 
 class _RecommendationCard extends StatelessWidget {
   final _RecommendationData data;
-  const _RecommendationCard({required this.data});
+  final VoidCallback? onTap;
+
+  const _RecommendationCard({required this.data, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 210,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: data.bg, borderRadius: BorderRadius.circular(18)),
-      child: Row(
-        children: [
-          Container(
-            height: 44,
-            width: 44,
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.85), borderRadius: BorderRadius.circular(13)),
-            child: Icon(data.icon, color: const Color(0xFF2D65BF), size: 23),
-          ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(data.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF17243C))),
-                const SizedBox(height: 3),
-                Text(data.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.2, color: Color(0xFF5A6C83))),
-              ],
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 210,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: data.bg,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          children: [
+            Container(
+              height: 44,
+              width: 44,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.85),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Icon(data.icon, color: const Color(0xFF2D65BF), size: 23),
             ),
-          ),
-        ],
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    data.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                      color: Color(0xFF17243C),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    data.subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10.2,
+                      color: Color(0xFF5A6C83),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -7306,6 +7343,555 @@ $notes
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ExamPrepScreen extends StatefulWidget {
+  const ExamPrepScreen({super.key});
+
+  @override
+  State<ExamPrepScreen> createState() => _ExamPrepScreenState();
+}
+
+class _ExamPrepScreenState extends State<ExamPrepScreen> {
+  static const List<String> _exams = <String>[
+    'WAEC',
+    'NECO',
+    'JAMB',
+    'Post-UTME',
+  ];
+
+  static const Map<String, List<String>> _subjects = <String, List<String>>{
+    'WAEC': <String>[
+      'Mathematics',
+      'English Language',
+      'Biology',
+      'Chemistry',
+      'Physics',
+      'Economics',
+      'Government',
+      'Literature in English',
+      'Geography',
+      'Commerce',
+      'Accounting',
+      'Agricultural Science',
+      'Civic Education',
+    ],
+    'NECO': <String>[
+      'Mathematics',
+      'English Language',
+      'Biology',
+      'Chemistry',
+      'Physics',
+      'Economics',
+      'Government',
+      'Literature in English',
+      'Geography',
+      'Commerce',
+      'Accounting',
+      'Agricultural Science',
+      'Civic Education',
+    ],
+    'JAMB': <String>[
+      'Use of English',
+      'Mathematics',
+      'Biology',
+      'Chemistry',
+      'Physics',
+      'Economics',
+      'Government',
+      'Literature in English',
+      'Geography',
+      'Commerce',
+      'Accounting',
+      'Agricultural Science',
+      'Christian Religious Studies',
+      'Islamic Religious Studies',
+    ],
+    'Post-UTME': <String>[
+      'English Language',
+      'Mathematics',
+      'Biology',
+      'Chemistry',
+      'Physics',
+      'Economics',
+      'Government',
+      'Geography',
+      'Commerce',
+      'Accounting',
+      'Agricultural Science',
+    ],
+  };
+
+  static const List<String> _modes = <String>[
+    'Practice Questions',
+    'Timed Mock',
+    'Revision Lesson',
+    'Explain an Answer',
+  ];
+
+  String _selectedExam = 'WAEC';
+  String _selectedSubject = 'Mathematics';
+  String _selectedMode = 'Practice Questions';
+  bool _busy = false;
+  String _output = '';
+  String _status = 'Choose an exam, subject, and study mode.';
+
+  List<String> get _availableSubjects =>
+      _subjects[_selectedExam] ?? const <String>[];
+
+  Future<void> _startPrep() async {
+    if (_busy) return;
+
+    setState(() {
+      _busy = true;
+      _output = '';
+      _status = 'TutorAI is preparing $_selectedMode...';
+    });
+
+    final prompt = _buildPrompt();
+    final context = TutorAcademicContext(
+      academicLevel: 'Senior Secondary',
+      examTarget: _selectedExam,
+      subject: _selectedSubject,
+      teachingMode: _selectedMode == 'Explain an Answer'
+          ? 'Teacher Mode'
+          : 'Exam Preparation',
+      difficulty: _selectedMode == 'Timed Mock'
+          ? 'Exam Level'
+          : 'Appropriate Exam Level',
+    );
+
+    final reply = await _tutorBackend.askStandaloneChat(
+      question: prompt,
+      context: context,
+      conversation: const <String>[],
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _busy = false;
+      _output = (reply == null || reply.trim().isEmpty)
+          ? 'TutorAI could not prepare this exam session right now. Please try again.'
+          : _cleanExamOutput(reply.trim());
+      _status = (reply == null || reply.trim().isEmpty)
+          ? 'Please try again.'
+          : 'Exam preparation session ready.';
+    });
+  }
+
+  String _cleanExamOutput(String text) {
+    var cleaned = text;
+
+    // Remove common Markdown wrappers because Exam Prep displays plain text.
+    cleaned = cleaned.replaceAll(RegExp(r'^\s*#{1,6}\s*', multiLine: true), '');
+    cleaned = cleaned.replaceAll('**', '');
+    cleaned = cleaned.replaceAll('__', '');
+
+    // Remove LaTeX math delimiters such as $...$, \( ... \), and \[ ... \].
+    cleaned = cleaned.replaceAll(RegExp(r'\$(.*?)\$', dotAll: true), r'$1');
+    cleaned = cleaned.replaceAll(r'\(', '');
+    cleaned = cleaned.replaceAll(r'\)', '');
+    cleaned = cleaned.replaceAll(r'\[', '');
+    cleaned = cleaned.replaceAll(r'\]', '');
+
+    // Turn common LaTeX commands into readable phone-friendly text.
+    cleaned = cleaned.replaceAll(
+      RegExp(r'\\frac\{([^{}]*)\}\{([^{}]*)\}'),
+      r'($1/$2)',
+    );
+    cleaned = cleaned.replaceAll(
+      RegExp(r'\\text\{([^{}]*)\}'),
+      r'$1',
+    );
+    cleaned = cleaned.replaceAll(r'\times', '×');
+    cleaned = cleaned.replaceAll(r'\cdot', '×');
+    cleaned = cleaned.replaceAll(r'\div', '÷');
+    cleaned = cleaned.replaceAll(r'\pi', 'π');
+    cleaned = cleaned.replaceAll(r'\sqrt', '√');
+    cleaned = cleaned.replaceAll(r'\log', 'log');
+    cleaned = cleaned.replaceAll(RegExp(r'\\([A-Za-z]+)'), r'$1');
+
+    // Normalize repeated blank lines for easier reading.
+    cleaned = cleaned.replaceAll(RegExp(r'\n{3,}'), '\n\n');
+    return cleaned.trim();
+  }
+
+  String _buildPrompt() {
+    final exam = _selectedExam;
+    final subject = _selectedSubject;
+    const formattingRule = '''Formatting rules: Return plain text only. Do not use Markdown headings, bold markers, LaTeX delimiters, or dollar signs as math delimiters. Write fractions as a/b, logarithms as log, and units such as cm^2 in normal text. Keep the questions easy to read on a phone.''';
+
+    switch (_selectedMode) {
+      case 'Timed Mock':
+        return '''Act as a careful $exam $subject exam tutor.
+
+Create a realistic timed mock practice set for a Nigerian secondary-school student.
+Use $exam as the exam target and $subject as the subject.
+
+Requirements:
+1. Create 10 exam-style questions.
+2. Make the questions clear and age-appropriate.
+3. Mix reasonable difficulty levels.
+4. Give four options (A-D) for objective questions when appropriate.
+5. Do not invent official past-paper wording or claim these are real past questions.
+6. After the questions, provide an answer key with concise explanations.
+7. Encourage the student to attempt the questions before checking the key.\n\n$formattingRule''';
+
+      case 'Revision Lesson':
+        return '''Act as a $exam $subject revision tutor.
+
+Create a focused revision lesson for a Nigerian student preparing for $exam.
+
+Requirements:
+1. Identify 5 important areas a student should revise in $subject.
+2. Teach the key idea for each area in simple language.
+3. Give one short example for each area.
+4. End with 5 quick self-check questions.
+5. Do not claim that any topic is guaranteed to appear in the exam.\n\n$formattingRule''';
+
+      case 'Explain an Answer':
+        return '''Act as a $exam $subject teacher.
+
+Prepare the student to understand and explain an exam answer.
+
+Show a simple method students can use when an answer is difficult:
+1. Identify what the question is asking.
+2. Identify the relevant concept or rule.
+3. Work through the reasoning step by step.
+4. Check the final answer.
+
+Then give one $subject example and explain it fully.
+Do not pretend you have a specific past question unless one is provided.\n\n$formattingRule''';
+
+      case 'Practice Questions':
+      default:
+        return '''Act as a $exam $subject exam tutor.
+
+Create a practice session for a Nigerian student preparing for $exam.
+
+Requirements:
+1. Create 5 exam-style questions in $subject.
+2. Use a mixture of straightforward and moderately challenging questions.
+3. Include four options (A-D) for objective questions when appropriate.
+4. Put the questions first so the student can attempt them independently.
+5. Then provide an answer key with a short teaching explanation for each answer.
+6. Do not claim these are official or real past questions unless that source was actually provided.\n\n$formattingRule''';
+    }
+  }
+
+  void _selectExam(String exam) {
+    final subjects = _subjects[exam] ?? const <String>[];
+    setState(() {
+      _selectedExam = exam;
+      if (!subjects.contains(_selectedSubject)) {
+        _selectedSubject = subjects.isEmpty ? '' : subjects.first;
+      }
+      _output = '';
+      _status = 'Choose a subject and study mode, then start prep.';
+    });
+  }
+
+  Widget _choiceCard({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFE2EEFF) : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? const Color(0xFF2D65BF) : const Color(0xFFD6E0EC),
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? const Color(0xFF174E9E) : const Color(0xFF31455F),
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F9FF),
+      appBar: AppBar(
+        title: const Text('Exam Prep'),
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF14213D),
+        elevation: 0,
+      ),
+      body: SafeArea(
+        child: SelectionArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(15, 16, 15, 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(19),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0E3F87), Color(0xFF2D65BF)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x292D65BF),
+                        blurRadius: 16,
+                        offset: Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Prepare with TutorAI',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 23,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            SizedBox(height: 7),
+                            Text(
+                              'Choose your exam, subject, and study mode. TutorAI will build a focused preparation session for you.',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12.4,
+                                height: 1.45,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Icon(
+                        Icons.assignment_turned_in_rounded,
+                        color: Colors.white,
+                        size: 44,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  '1. Choose your exam',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF17243C),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final exam in _exams)
+                      _choiceCard(
+                        label: exam,
+                        selected: _selectedExam == exam,
+                        onTap: () => _selectExam(exam),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  '2. Choose your subject',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF17243C),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedSubject,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: Color(0xFFD6E0EC)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: Color(0xFFD6E0EC)),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                  items: [
+                    for (final subject in _availableSubjects)
+                      DropdownMenuItem<String>(
+                        value: subject,
+                        child: Text(subject),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() {
+                      _selectedSubject = value;
+                      _output = '';
+                      _status = 'Choose a study mode, then start prep.';
+                    });
+                  },
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  '3. Choose your study mode',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF17243C),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final mode in _modes)
+                      _choiceCard(
+                        label: mode,
+                        selected: _selectedMode == mode,
+                        onTap: () {
+                          setState(() {
+                            _selectedMode = mode;
+                            _output = '';
+                            _status = 'Ready to start $_selectedMode.';
+                          });
+                        },
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                ElevatedButton.icon(
+                  onPressed: _busy ? null : _startPrep,
+                  icon: _busy
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.play_arrow_rounded),
+                  label: Text(_busy ? 'Preparing...' : 'Start Exam Prep'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2D65BF),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEAF2FF),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    _status,
+                    style: const TextStyle(
+                      fontSize: 12.2,
+                      height: 1.45,
+                      color: Color(0xFF31506F),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (_output.trim().isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x1422446B),
+                          blurRadius: 15,
+                          offset: Offset(0, 7),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$_selectedExam • $_selectedSubject',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF17243C),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _selectedMode,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF5D7690),
+                          ),
+                        ),
+                        const SizedBox(height: 13),
+                        Text(
+                          _output,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            height: 1.55,
+                            color: Color(0xFF253852),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _startPrep,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Generate Another Set'),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                const Text(
+                  'TutorAI creates exam-style study material for practice. It does not claim generated questions are official past questions.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 10.8,
+                    height: 1.4,
+                    color: Color(0xFF718096),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
