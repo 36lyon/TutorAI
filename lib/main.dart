@@ -9,8 +9,14 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_pdf_text/flutter_pdf_text.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import './study_plan.dart' as study_plan;
+import './study_plan_screen.dart' as study_plan_ui;
 
-void main() {
+final study_plan.StudyPlanStore studyPlanStore = study_plan.StudyPlanStore();
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await studyPlanStore.load();
   runApp(const TutorAiApp());
 }
 
@@ -225,7 +231,7 @@ class HomeScreen extends StatelessWidget {
                     const items = [
                       _RecommendationData(Icons.track_changes_rounded, 'Take a Quiz', 'Test your knowledge', Color(0xFFFFEBCB)),
                       _RecommendationData(Icons.event_note_rounded, 'Exam Prep', 'Get ready to excel', Color(0xFFE2EEFF)),
-                      _RecommendationData(Icons.lightbulb_rounded, 'Daily Learning', 'New topic for you', Color(0xFFFFE1F0)),
+                      _RecommendationData(Icons.calendar_month_rounded, 'Study Plan', 'Build your study schedule', Color(0xFFFFE1F0)),
                       _RecommendationData(Icons.emoji_events_rounded, 'Achievements', 'Earn badges & rewards', Color(0xFFDDF8E8)),
                     ];
                     return _RecommendationCard(
@@ -236,7 +242,15 @@ class HomeScreen extends StatelessWidget {
                                 builder: (_) => const ExamPrepScreen(),
                               ),
                             )
-                          : null,
+                          : index == 2
+                              ? () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => study_plan_ui.StudyPlanScreen(
+                                      store: studyPlanStore,
+                                    ),
+                                  ),
+                                )
+                              : null,
                     );
                   },
                 ),
