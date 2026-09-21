@@ -9,6 +9,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_pdf_text/flutter_pdf_text.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import './study_plan.dart' as study_plan;
 import './study_plan_screen.dart' as study_plan_ui;
 
@@ -6715,10 +6716,283 @@ class _ProgressStatCard extends StatelessWidget {
   }
 }
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
   @override
-  Widget build(BuildContext context) => const Center(child: Text('Profile', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900)));
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  static const _nameKey = 'profile_name';
+  static const _levelKey = 'profile_academic_level';
+
+  final TextEditingController _nameController = TextEditingController();
+
+  String _academicLevel = 'Senior Secondary';
+  bool _loading = true;
+  bool _saving = false;
+
+  static const List<String> _academicLevels = <String>[
+    'Junior Secondary',
+    'Senior Secondary',
+    'University',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    if (!mounted) return;
+
+    setState(() {
+      _nameController.text = prefs.getString(_nameKey) ?? '';
+      _academicLevel =
+          prefs.getString(_levelKey) ?? 'Senior Secondary';
+      _loading = false;
+    });
+  }
+
+  Future<void> _saveProfile() async {
+    if (_saving) return;
+
+    setState(() => _saving = true);
+
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.setString(_nameKey, _nameController.text.trim());
+    await prefs.setString(_levelKey, _academicLevel);
+
+    if (!mounted) return;
+
+    setState(() => _saving = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Profile settings saved.'),
+      ),
+    );
+  }
+
+  Future<void> _resetProfile() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Reset profile?'),
+          content: const Text(
+            'This will clear the name and academic level saved on this device.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Reset'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.remove(_nameKey);
+    await prefs.remove(_levelKey);
+
+    if (!mounted) return;
+
+    setState(() {
+      _nameController.clear();
+      _academicLevel = 'Senior Secondary';
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Profile reset.'),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    final displayName = _nameController.text.trim().isEmpty
+        ? 'Student'
+        : _nameController.text.trim();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Profile & Settings'),
+        centerTitle: true,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Center(
+            child: CircleAvatar(
+              radius: 42,
+              child: Text(
+                displayName.isEmpty
+                    ? 'S'
+                    : displayName.substring(0, 1).toUpperCase(),
+                style: const TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Center(
+            child: Text(
+              displayName,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Center(
+            child: Text(
+              _academicLevel,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          const Text(
+            'Profile',
+            style: TextStyle(
+              fontSize: 21,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          TextField(
+            controller: _nameController,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: 'Student name',
+              hintText: 'Enter your name',
+              prefixIcon: Icon(Icons.person_outline_rounded),
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 14),
+
+          DropdownButtonFormField<String>(
+            initialValue: _academicLevel,
+            decoration: const InputDecoration(
+              labelText: 'Academic level',
+              prefixIcon: Icon(Icons.school_outlined),
+              border: OutlineInputBorder(),
+            ),
+            items: _academicLevels
+                .map(
+                  (level) => DropdownMenuItem<String>(
+                    value: level,
+                    child: Text(level),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() => _academicLevel = value);
+            },
+          ),
+          const SizedBox(height: 16),
+
+          SizedBox(
+            height: 50,
+            child: FilledButton.icon(
+              onPressed: _saving ? null : _saveProfile,
+              icon: _saving
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(Icons.save_rounded),
+              label: Text(
+                _saving ? 'Saving...' : 'Save Profile',
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 28),
+          const Text(
+            'Settings',
+            style: TextStyle(
+              fontSize: 21,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.lock_outline_rounded),
+              title: const Text('Profile data'),
+              subtitle: const Text(
+                'Your profile name and academic level are stored locally on this device.',
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.info_outline_rounded),
+              title: const Text('About TutorAI'),
+              subtitle: const Text(
+                'TutorAI helps students learn, practise, prepare for exams, and track progress.',
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.restart_alt_rounded),
+              title: const Text('Reset profile'),
+              subtitle: const Text(
+                'Remove the profile information saved on this device.',
+              ),
+              onTap: _resetProfile,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 
