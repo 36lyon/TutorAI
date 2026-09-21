@@ -2140,6 +2140,7 @@ class TutorBackendClient {
     required String question,
     required TutorAcademicContext context,
     required List<String> conversation,
+    void Function(String accumulatedText)? onChunk,
   }) async {
     if (!isConfigured) {
       debugPrint('TutorAI CHAT ERROR: backend URL is not configured.');
@@ -2151,14 +2152,14 @@ class TutorBackendClient {
     client.idleTimeout = const Duration(seconds: 15);
 
     try {
-      final uri = _uri('/v1/tutor/chat');
+      final uri = _uri('/v1/tutor/chat/stream');
       debugPrint('TutorAI CHAT: POST $uri');
 
       final request = await client.postUrl(uri).timeout(
         const Duration(seconds: 10),
       );
       request.headers.contentType = ContentType.json;
-      request.headers.set('Accept', 'application/json');
+      request.headers.set('Accept', 'text/event-stream');
       request.write(jsonEncode({
         'question': question,
         'academicContext': context.toJson(),
@@ -2168,28 +2169,54 @@ class TutorBackendClient {
       final response = await request.close().timeout(
         const Duration(seconds: 30),
       );
-      final body = await utf8.decoder.bind(response).join();
+
       debugPrint('TutorAI CHAT: HTTP ${response.statusCode}');
-      debugPrint('TutorAI CHAT RESPONSE: $body');
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        debugPrint(
-          'TutorAI CHAT ERROR: backend returned HTTP ${response.statusCode}',
-        );
+        final body = await utf8.decoder.bind(response).join();
+        debugPrint('TutorAI CHAT ERROR RESPONSE: $body');
         return null;
       }
 
-      final decoded = jsonDecode(body);
-      if (decoded is Map<String, dynamic>) {
-        final reply = decoded['reply'];
-        if (reply is String && reply.trim().isNotEmpty) {
-          debugPrint('TutorAI CHAT: real AI reply received.');
-          return reply.trim();
+      final chunks = <String>[];
+
+      await for (final line in utf8.decoder
+          .bind(response)
+          .transform(const LineSplitter())) {
+        if (!line.startsWith('data:')) continue;
+
+        final data = line.substring(5).trim();
+
+        if (data.isEmpty) continue;
+        if (data == '[DONE]') break;
+
+        try {
+          final decoded = jsonDecode(data);
+
+          if (decoded is String) {
+            chunks.add(decoded);
+            onChunk?.call(chunks.join());
+          } else if (decoded is Map<String, dynamic> &&
+              decoded['error'] is String) {
+            debugPrint(
+              'TutorAI CHAT STREAM ERROR: ${decoded['error']}',
+            );
+            return null;
+          }
+        } catch (error) {
+          debugPrint('TutorAI CHAT STREAM PARSE ERROR: $error');
         }
       }
 
+      final reply = chunks.join().trim();
+
+      if (reply.isNotEmpty) {
+        debugPrint('TutorAI CHAT: real AI streaming reply received.');
+        return reply;
+      }
+
       debugPrint(
-        'TutorAI CHAT ERROR: response did not contain a usable reply.',
+        'TutorAI CHAT ERROR: streaming response did not contain a usable reply.',
       );
       return null;
     } catch (error, stackTrace) {
@@ -7484,6 +7511,14 @@ class _ExamPrepScreenState extends State<ExamPrepScreen> {
       question: prompt,
       context: context,
       conversation: const <String>[],
+      onChunk: (accumulatedText) {
+        if (!mounted) return;
+
+        setState(() {
+          _output = _cleanExamOutput(accumulatedText);
+          _status = 'TutorAI is generating your $_selectedMode...';
+        });
+      },
     );
 
     if (!mounted) return;

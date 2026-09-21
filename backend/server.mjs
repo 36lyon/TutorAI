@@ -800,6 +800,143 @@ Return plain text only.`;
 }
 
 // ============================================================
+// /v1/tutor/chat/stream
+// ============================================================
+
+async function tutorChatStream(req, res) {
+  const body = await readJson(req);
+
+  const route = chooseAiRoute({
+    purpose: 'chat',
+    question: body.question,
+  });
+
+  const config = providerConfig(route.provider);
+
+  if (!config.apiKey) {
+    throw new Error(config.errorName + ' API key is not configured.');
+  }
+
+  const payload = {
+    model: route.model,
+    messages: [
+      {
+        role: 'system',
+        content: buildChatSystemPrompt(),
+      },
+      {
+        role: 'user',
+        content: buildChatUserPrompt(body),
+      },
+    ],
+    stream: true,
+  };
+
+  if (route.provider === 'deepseek') {
+    payload.max_tokens = route.maxOutputTokens;
+  } else {
+    payload.max_completion_tokens = route.maxOutputTokens;
+  }
+
+  if (route.reasoningEffort) {
+    payload.reasoning_effort = route.reasoningEffort;
+  }
+
+  const response = await fetch(
+    config.baseUrl + '/chat/completions',
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: 'Bearer ' + config.apiKey,
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  if (!response.ok) {
+    const raw = await response.text();
+    throw new Error(
+      config.errorName +
+        ' ' +
+        response.status +
+        ': ' +
+        raw.slice(0, 700),
+    );
+  }
+
+  if (!response.body) {
+    throw new Error(
+      config.errorName + ' returned no streaming body.',
+    );
+  }
+
+  res.writeHead(200, {
+    'content-type': 'text/event-stream; charset=utf-8',
+    'cache-control': 'no-cache, no-store',
+    connection: 'keep-alive',
+    'x-tutorai-provider': route.provider,
+    'x-tutorai-model': route.model,
+  });
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const result = await reader.read();
+
+      if (result.done) break;
+
+      buffer += decoder.decode(result.value, { stream: true });
+
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+
+        const data = line.slice(5).trim();
+
+        if (!data || data === '[DONE]') continue;
+
+        try {
+          const chunk = JSON.parse(data);
+          const delta = chunk?.choices?.[0]?.delta?.content;
+
+          if (typeof delta === 'string' && delta.length > 0) {
+            res.write(
+              'data: ' +
+                JSON.stringify(delta) +
+                '\n\n',
+            );
+          }
+        } catch (_) {
+          // Ignore non-JSON stream lines.
+        }
+      }
+    }
+
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (error) {
+    if (!res.writableEnded) {
+      res.write(
+        'data: ' +
+          JSON.stringify({
+            error: error?.message || 'Streaming failed.',
+          }) +
+          '\n\n',
+      );
+      res.end();
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+// ============================================================
 // /v1/tutor/chat
 // ============================================================
 
@@ -878,6 +1015,10 @@ const server = http.createServer(async (req, res) => {
     // --------------------------
     // CHAT
     // --------------------------
+
+    if (req.method === 'POST' && req.url === '/v1/tutor/chat/stream') {
+      return await tutorChatStream(req, res);
+    }
 
     if (req.method === 'POST' && req.url === '/v1/tutor/chat') {
       return await tutorChat(req, res);
