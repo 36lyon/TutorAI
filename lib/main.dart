@@ -250,7 +250,13 @@ class HomeScreen extends StatelessWidget {
                                     ),
                                   ),
                                 )
-                              : null,
+                              : index == 3
+                                  ? () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => const AchievementsScreen(),
+                                      ),
+                                    )
+                                  : null,
                     );
                   },
                 ),
@@ -5911,6 +5917,354 @@ class _PracticeScreenState extends State<PracticeScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+
+class AchievementsScreen extends StatelessWidget {
+  const AchievementsScreen({super.key});
+
+  String _dateKey(DateTime date) {
+    return '\${date.year}-\${date.month}-\${date.day}';
+  }
+
+  int _currentStreak(List<_ProgressSession> sessions) {
+    if (sessions.isEmpty) return 0;
+
+    final dates = sessions
+        .map((session) => DateTime(
+              session.completedAt.year,
+              session.completedAt.month,
+              session.completedAt.day,
+            ))
+        .toSet()
+        .toList()
+      ..sort((a, b) => b.compareTo(a));
+
+    if (dates.isEmpty) return 0;
+
+    final today = DateTime(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
+
+    final mostRecent = dates.first;
+    final daysSinceMostRecent = today.difference(mostRecent).inDays;
+
+    if (daysSinceMostRecent > 1) return 0;
+
+    int streak = 1;
+
+    for (int i = 1; i < dates.length; i++) {
+      final gap = dates[i - 1].difference(dates[i]).inDays;
+
+      if (gap == 1) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  }
+
+  int _longestStreak(List<_ProgressSession> sessions) {
+    if (sessions.isEmpty) return 0;
+
+    final dates = sessions
+        .map((session) => DateTime(
+              session.completedAt.year,
+              session.completedAt.month,
+              session.completedAt.day,
+            ))
+        .toSet()
+        .toList()
+      ..sort();
+
+    int longest = 1;
+    int current = 1;
+
+    for (int i = 1; i < dates.length; i++) {
+      final gap = dates[i].difference(dates[i - 1]).inDays;
+
+      if (gap == 1) {
+        current++;
+        if (current > longest) longest = current;
+      } else {
+        current = 1;
+      }
+    }
+
+    return longest;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: tutorProgress,
+      builder: (context, _) {
+        final sessions = tutorProgress.sessions;
+        final totalQuestions = tutorProgress.totalQuestions;
+        final totalCorrect = tutorProgress.totalCorrect;
+        final accuracy = tutorProgress.accuracy;
+        final practiceSessions = tutorProgress.practiceSessions;
+        final currentStreak = _currentStreak(sessions);
+        final longestStreak = _longestStreak(sessions);
+
+        final earnedBadges = <Map<String, dynamic>>[
+          {
+            'title': 'First Step',
+            'description': 'Complete your first practice session.',
+            'icon': Icons.flag_rounded,
+            'earned': practiceSessions >= 1,
+          },
+          {
+            'title': 'Getting Serious',
+            'description': 'Complete 5 practice sessions.',
+            'icon': Icons.local_fire_department_rounded,
+            'earned': practiceSessions >= 5,
+          },
+          {
+            'title': 'Question Crusher',
+            'description': 'Answer 100 practice questions.',
+            'icon': Icons.psychology_rounded,
+            'earned': totalQuestions >= 100,
+          },
+          {
+            'title': 'Perfect Score',
+            'description': 'Finish a practice session with 100% accuracy.',
+            'icon': Icons.star_rounded,
+            'earned': sessions.any(
+              (session) =>
+                  session.total > 0 && session.correct == session.total,
+            ),
+          },
+          {
+            'title': '7-Day Streak',
+            'description': 'Study on 7 consecutive days.',
+            'icon': Icons.calendar_today_rounded,
+            'earned': longestStreak >= 7,
+          },
+          {
+            'title': 'Mastery',
+            'description': 'Reach at least 90% overall accuracy.',
+            'icon': Icons.workspace_premium_rounded,
+            'earned': totalQuestions > 0 && accuracy >= 90,
+          },
+        ];
+
+        final earnedCount =
+            earnedBadges.where((badge) => badge['earned'] == true).length;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Achievements & Streaks'),
+            centerTitle: true,
+          ),
+          body: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                ),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.local_fire_department_rounded,
+                      size: 52,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '$currentStreak day streak',
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      currentStreak == 0
+                          ? 'Complete a practice session today to start your streak.'
+                          : 'Keep studying regularly to protect your streak.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: _AchievementStatCard(
+                      label: 'Best Streak',
+                      value: '$longestStreak days',
+                      icon: Icons.bolt_rounded,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _AchievementStatCard(
+                      label: 'Badges',
+                      value: '$earnedCount/${earnedBadges.length}',
+                      icon: Icons.emoji_events_rounded,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: _AchievementStatCard(
+                      label: 'Sessions',
+                      value: '$practiceSessions',
+                      icon: Icons.menu_book_rounded,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _AchievementStatCard(
+                      label: 'Accuracy',
+                      value: '$accuracy%',
+                      icon: Icons.track_changes_rounded,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Your Badges',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 10),
+              ...earnedBadges.map(
+                (badge) => _AchievementBadgeCard(
+                  title: badge['title'] as String,
+                  description: badge['description'] as String,
+                  icon: badge['icon'] as IconData,
+                  earned: badge['earned'] as bool,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AchievementStatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _AchievementStatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: Theme.of(context).dividerColor,
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 28),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AchievementBadgeCard extends StatelessWidget {
+  final String title;
+  final String description;
+  final IconData icon;
+  final bool earned;
+
+  const _AchievementBadgeCard({
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.earned,
+  });
+
+  void _showDetails(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(earned ? icon : Icons.lock_outline_rounded),
+              const SizedBox(width: 10),
+              Expanded(child: Text(title)),
+            ],
+          ),
+          content: Text(
+            earned
+                ? '$description\n\nStatus: Earned'
+                : '$description\n\nStatus: Locked',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        onTap: () => _showDetails(context),
+        leading: CircleAvatar(
+          child: Icon(
+            earned ? icon : Icons.lock_outline_rounded,
+          ),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        subtitle: Text(description),
+        trailing: earned
+            ? const Icon(Icons.check_circle_rounded)
+            : const Text('Locked'),
       ),
     );
   }
