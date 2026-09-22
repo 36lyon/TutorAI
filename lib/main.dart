@@ -18,6 +18,7 @@ final study_plan.StudyPlanStore studyPlanStore = study_plan.StudyPlanStore();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await studyPlanStore.load();
+  await tutorProgress.load();
   runApp(const TutorAiApp());
 }
 
@@ -36,7 +37,10 @@ class _ProgressSession {
 }
 
 class TutorProgressStore extends ChangeNotifier {
+  static const String _storageKey = 'tutor_ai_progress_v1';
+
   final List<_ProgressSession> _sessions = <_ProgressSession>[];
+  bool _loaded = false;
 
   List<_ProgressSession> get sessions =>
       List<_ProgressSession>.unmodifiable(_sessions);
@@ -67,11 +71,62 @@ class TutorProgressStore extends ChangeNotifier {
     return grouped;
   }
 
-  void recordPracticeSession({
+  Future<void> load() async {
+    if (_loaded) return;
+
+    final preferences = await SharedPreferences.getInstance();
+    final raw = preferences.getString(_storageKey);
+
+    _sessions.clear();
+
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+
+        if (decoded is List) {
+          for (final item in decoded) {
+            if (item is Map) {
+              final data = Map<String, dynamic>.from(item);
+
+              final subject = data['subject'];
+              final correct = data['correct'];
+              final total = data['total'];
+              final completedAt = data['completedAt'];
+
+              if (subject is String &&
+                  correct is int &&
+                  total is int &&
+                  completedAt is String) {
+                final parsedDate = DateTime.tryParse(completedAt);
+
+                if (parsedDate != null) {
+                  _sessions.add(
+                    _ProgressSession(
+                      subject: subject,
+                      correct: correct,
+                      total: total,
+                      completedAt: parsedDate,
+                    ),
+                  );
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {
+        _sessions.clear();
+      }
+    }
+
+    _loaded = true;
+    notifyListeners();
+  }
+
+  Future<void> recordPracticeSession({
     required String subject,
     required int correct,
     required int total,
-  }) {
+  }) async {
     _sessions.add(
       _ProgressSession(
         subject: subject,
@@ -81,12 +136,33 @@ class TutorProgressStore extends ChangeNotifier {
       ),
     );
 
+    await _persist();
     notifyListeners();
   }
 
-  void clear() {
+  Future<void> clear() async {
     _sessions.clear();
+    await _persist();
     notifyListeners();
+  }
+
+  Future<void> _persist() async {
+    final preferences = await SharedPreferences.getInstance();
+
+    final encoded = jsonEncode(
+      _sessions
+          .map(
+            (session) => {
+              'subject': session.subject,
+              'correct': session.correct,
+              'total': session.total,
+              'completedAt': session.completedAt.toIso8601String(),
+            },
+          )
+          .toList(),
+    );
+
+    await preferences.setString(_storageKey, encoded);
   }
 }
 
@@ -5569,17 +5645,19 @@ class _PracticeScreenState extends State<PracticeScreen> {
     setState(() {});
   }
 
-  void _nextQuestion() {
+  Future<void> _nextQuestion() async {
     if (!_checked) return;
 
     if (_questionIndex >= _questions.length - 1) {
       if (!_progressRecorded) {
-        tutorProgress.recordPracticeSession(
+        await tutorProgress.recordPracticeSession(
           subject: _selectedSubject ?? 'Practice',
           correct: _score,
           total: _questions.length,
         );
       }
+
+      if (!mounted) return;
 
       setState(() {
         _progressRecorded = true;
