@@ -313,27 +313,33 @@ class HomeScreen extends StatelessWidget {
                     ];
                     return _RecommendationCard(
                       data: items[index],
-                      onTap: index == 1
+                      onTap: index == 0
                           ? () => Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) => const ExamPrepScreen(),
+                                builder: (_) => const PracticeScreen(),
                               ),
                             )
-                          : index == 2
+                          : index == 1
                               ? () => Navigator.of(context).push(
                                   MaterialPageRoute(
-                                    builder: (_) => study_plan_ui.StudyPlanScreen(
-                                      store: studyPlanStore,
-                                    ),
+                                    builder: (_) => const ExamPrepScreen(),
                                   ),
                                 )
-                              : index == 3
+                              : index == 2
                                   ? () => Navigator.of(context).push(
                                       MaterialPageRoute(
-                                        builder: (_) => const AchievementsScreen(),
+                                        builder: (_) => study_plan_ui.StudyPlanScreen(
+                                          store: studyPlanStore,
+                                        ),
                                       ),
                                     )
-                                  : null,
+                                  : index == 3
+                                      ? () => Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) => const AchievementsScreen(),
+                                          ),
+                                        )
+                                      : null,
                     );
                   },
                 ),
