@@ -1,10 +1,11 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_pdf_text/flutter_pdf_text.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -167,6 +168,7 @@ class TutorProgressStore extends ChangeNotifier {
 }
 
 final TutorProgressStore tutorProgress = TutorProgressStore();
+
 class TutorAiApp extends StatelessWidget {
   const TutorAiApp({super.key});
 
@@ -277,26 +279,90 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 14),
               const _LearningSection(),
               const SizedBox(height: 18),
-              const _SectionHeader(title: 'Continue Learning', action: 'See all'),
+              _SectionHeader(
+                title: 'Continue Learning',
+                action: 'See all',
+                onActionTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LearnScreen()),
+                ),
+              ),
               const SizedBox(height: 10),
               SizedBox(
                 height: 106,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: 3,
-                  separatorBuilder: (_, __) => const SizedBox(width: 10),
-                  itemBuilder: (context, index) {
-                    const courses = [
-                      _CourseData('Mathematics', 'Algebra', 0.72, Icons.calculate_rounded, Color(0xFF8F56FF)),
-                      _CourseData('Science', 'Human Body', 0.64, Icons.science_rounded, Color(0xFF18B76A)),
-                      _CourseData('English', 'Reading & Comprehension', 0.81, Icons.menu_book_rounded, Color(0xFFFF4F6D)),
+                child: AnimatedBuilder(
+                  animation: tutorProgress,
+                  builder: (context, _) {
+                    double subjectProgress(String subject) {
+                      for (final entry
+                          in tutorProgress.sessionsBySubject.entries) {
+                        if (entry.key.trim().toLowerCase() !=
+                            subject.trim().toLowerCase()) {
+                          continue;
+                        }
+
+                        final sessions = entry.value;
+                        final total = sessions.fold<int>(
+                          0,
+                          (sum, session) => sum + session.total,
+                        );
+                        final correct = sessions.fold<int>(
+                          0,
+                          (sum, session) => sum + session.correct,
+                        );
+
+                        if (total == 0) return 0.0;
+                        return correct / total;
+                      }
+
+                      return 0.0;
+                    }
+
+                    final courses = [
+                      _CourseData(
+                        'Mathematics',
+                        'Algebra',
+                        subjectProgress('Mathematics'),
+                        Icons.calculate_rounded,
+                        const Color(0xFF8F56FF),
+                      ),
+                      _CourseData(
+                        'Science',
+                        'Human Body',
+                        subjectProgress('Science'),
+                        Icons.science_rounded,
+                        const Color(0xFF18B76A),
+                      ),
+                      _CourseData(
+                        'English',
+                        'Reading & Comprehension',
+                        subjectProgress('English'),
+                        Icons.menu_book_rounded,
+                        const Color(0xFFFF4F6D),
+                      ),
                     ];
-                    return _CourseCard(data: courses[index]);
+
+                    return ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: courses.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 10),
+                      itemBuilder: (context, index) {
+                        return GestureDetector(
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => LearnScreen(
+                                initialSubject: courses[index].title,
+                              ),
+                            ),
+                          ),
+                          child: _CourseCard(data: courses[index]),
+                        );
+                      },
+                    );
                   },
                 ),
               ),
               const SizedBox(height: 18),
-              const _SectionHeader(title: 'Recommended for You', action: 'See all'),
+              const _SectionHeader(title: 'Recommended for You', action: ''),
               const SizedBox(height: 10),
               SizedBox(
                 height: 96,
@@ -306,39 +372,54 @@ class HomeScreen extends StatelessWidget {
                   separatorBuilder: (_, __) => const SizedBox(width: 10),
                   itemBuilder: (context, index) {
                     const items = [
-                      _RecommendationData(Icons.track_changes_rounded, 'Take a Quiz', 'Test your knowledge', Color(0xFFFFEBCB)),
-                      _RecommendationData(Icons.event_note_rounded, 'Exam Prep', 'Get ready to excel', Color(0xFFE2EEFF)),
-                      _RecommendationData(Icons.calendar_month_rounded, 'Study Plan', 'Build your study schedule', Color(0xFFFFE1F0)),
-                      _RecommendationData(Icons.emoji_events_rounded, 'Achievements', 'Earn badges & rewards', Color(0xFFDDF8E8)),
+                      _RecommendationData(
+                          Icons.track_changes_rounded,
+                          'Take a Quiz',
+                          'Test your knowledge',
+                          Color(0xFFFFEBCB)),
+                      _RecommendationData(Icons.event_note_rounded, 'Exam Prep',
+                          'Get ready to excel', Color(0xFFE2EEFF)),
+                      _RecommendationData(
+                          Icons.calendar_month_rounded,
+                          'Study Plan',
+                          'Build your study schedule',
+                          Color(0xFFFFE1F0)),
+                      _RecommendationData(
+                          Icons.emoji_events_rounded,
+                          'Achievements',
+                          'Earn badges & rewards',
+                          Color(0xFFDDF8E8)),
                     ];
                     return _RecommendationCard(
                       data: items[index],
                       onTap: index == 0
                           ? () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const PracticeScreen(),
-                              ),
-                            )
+                                MaterialPageRoute(
+                                  builder: (_) => const PracticeScreen(),
+                                ),
+                              )
                           : index == 1
                               ? () => Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => const ExamPrepScreen(),
-                                  ),
-                                )
+                                    MaterialPageRoute(
+                                      builder: (_) => const ExamPrepScreen(),
+                                    ),
+                                  )
                               : index == 2
                                   ? () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => study_plan_ui.StudyPlanScreen(
-                                          store: studyPlanStore,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              study_plan_ui.StudyPlanScreen(
+                                            store: studyPlanStore,
+                                          ),
                                         ),
-                                      ),
-                                    )
+                                      )
                                   : index == 3
                                       ? () => Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (_) => const AchievementsScreen(),
-                                          ),
-                                        )
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  const AchievementsScreen(),
+                                            ),
+                                          )
                                       : null,
                     );
                   },
@@ -440,27 +521,41 @@ class _HomeHero extends StatelessWidget {
             ),
           ),
 
-          // Greeting is placed above the artwork layer and is fully visible.
+          // Greeting keeps its original position and text. Only the hand treatment changes.
           const Positioned(
             left: 7,
             top: 99,
-            width: 186,
+            width: 195,
             child: FittedBox(
               alignment: Alignment.centerLeft,
               fit: BoxFit.scaleDown,
-              child: Text(
-                'Good evening! 👋',
-                maxLines: 1,
-                style: TextStyle(
-                  fontSize: 25,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF14213D),
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Good evening!',
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: 25,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF14213D),
+                    ),
+                  ),
+                  SizedBox(width: 6),
+                  _TutorAi3DIcon(
+                    icon: Icons.waving_hand_rounded,
+                    size: 29,
+                    colors: [
+                      Color(0xFFFFF176),
+                      Color(0xFFFFC107),
+                      Color(0xFFFF9800),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
-
-          // Full question is guaranteed to remain visible, with no microphone here.
+// Full question is guaranteed to remain visible, with no microphone here.
           const Positioned(
             left: 7,
             top: 136,
@@ -585,7 +680,8 @@ class _GraduationCapPainter extends CustomPainter {
       Offset(size.width * 0.72, size.height * 0.73),
       tasselLine,
     );
-    canvas.drawCircle(Offset(size.width * 0.72, size.height * 0.79), 3.2, goldPaint);
+    canvas.drawCircle(
+        Offset(size.width * 0.72, size.height * 0.79), 3.2, goldPaint);
     canvas.drawLine(
       Offset(size.width * 0.69, size.height * 0.80),
       Offset(size.width * 0.75, size.height * 0.80),
@@ -615,7 +711,8 @@ class _HeroFallback extends StatelessWidget {
               color: const Color(0xFFDDEAFF),
               borderRadius: BorderRadius.circular(28),
             ),
-            child: const Icon(Icons.person_rounded, size: 70, color: Color(0xFF4D80D8)),
+            child: const Icon(Icons.person_rounded,
+                size: 70, color: Color(0xFF4D80D8)),
           ),
           const SizedBox(width: 8),
           Container(
@@ -625,7 +722,8 @@ class _HeroFallback extends StatelessWidget {
               color: const Color(0xFFE7F1FF),
               borderRadius: BorderRadius.circular(24),
             ),
-            child: const Icon(Icons.smart_toy_rounded, size: 56, color: Color(0xFF4D80D8)),
+            child: const Icon(Icons.smart_toy_rounded,
+                size: 56, color: Color(0xFF4D80D8)),
           ),
         ],
       ),
@@ -690,23 +788,26 @@ class _FeatureStrip extends StatelessWidget {
                     ? onSnap
                     : i == 1
                         ? () => Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const VoiceTutorScreen()),
-                          )
+                              MaterialPageRoute(
+                                  builder: (_) => const VoiceTutorScreen()),
+                            )
                         : i == 2
                             ? () => Navigator.of(context).push(
-                                MaterialPageRoute(builder: (_) => const StudyMyNotesScreen()),
-                              )
+                                  MaterialPageRoute(
+                                      builder: (_) =>
+                                          const StudyMyNotesScreen()),
+                                )
                             : i == 3
                                 ? () => Navigator.of(context).push(
-                                    MaterialPageRoute(builder: (_) => const PracticeScreen()),
-                                  )
+                                      MaterialPageRoute(
+                                          builder: (_) =>
+                                              const PracticeScreen()),
+                                    )
                                 : () => Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => PlaceholderScreen(
-                                        title: cards[i].title.replaceAll('\n', ' '),
+                                      MaterialPageRoute(
+                                        builder: (_) => const ProgressScreen(),
                                       ),
                                     ),
-                                  ),
               ),
             ),
           ],
@@ -844,6 +945,84 @@ class _FeatureData {
   );
 }
 
+class _TutorAi3DAssetIcon extends StatelessWidget {
+  final String asset;
+  final double size;
+
+  const _TutorAi3DAssetIcon({
+    required this.asset,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size + 5,
+      height: size + 6,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 4,
+            top: 5,
+            child: ColorFiltered(
+              colorFilter: const ColorFilter.mode(
+                Color(0xFF31517F),
+                BlendMode.srcIn,
+              ),
+              child: Image.asset(
+                asset,
+                width: size,
+                height: size,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+          Positioned(
+            left: 2,
+            top: 3,
+            child: ColorFiltered(
+              colorFilter: const ColorFilter.mode(
+                Color(0xFF6C8DBD),
+                BlendMode.srcIn,
+              ),
+              child: Image.asset(
+                asset,
+                width: size,
+                height: size,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+          Image.asset(
+            asset,
+            width: size,
+            height: size,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+          ),
+          Positioned(
+            left: 3,
+            top: 1,
+            child: Container(
+              width: size * 0.72,
+              height: 4,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                gradient: const LinearGradient(
+                  colors: [
+                    Color(0x88FFFFFF),
+                    Color(0x00FFFFFF),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 class _FeatureCard extends StatelessWidget {
   final _FeatureData data;
   final VoidCallback onTap;
@@ -885,14 +1064,11 @@ class _FeatureCard extends StatelessWidget {
                   color: data.haloColor,
                 ),
                 child: Center(
-                  child: Image.asset(
-                    data.iconAsset,
-                    width: 52,
-                    height: 52,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
+                    child: _TutorAi3DAssetIcon(
+                      asset: data.iconAsset,
+                      size: 52,
+                    ),
                   ),
-                ),
               ),
               const SizedBox(height: 3),
               Text(
@@ -959,8 +1135,10 @@ class _SearchCard extends StatelessWidget {
               Container(
                 height: 38,
                 width: 38,
-                decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFE7F0FF)),
-                child: const Icon(Icons.mic_rounded, color: Color(0xFF2563EB)),
+                decoration: const BoxDecoration(
+                    shape: BoxShape.circle, color: Color(0xFFE7F0FF)),
+                child: const Icon(Icons.camera_alt_rounded,
+                    color: Color(0xFF2563EB)),
               ),
             ],
           ),
@@ -1000,6 +1178,62 @@ class _LearningSection extends StatelessWidget {
   }
 }
 
+class _TutorAi3DIcon extends StatelessWidget {
+  final IconData icon;
+  final double size;
+  final List<Color> colors;
+
+  const _TutorAi3DIcon({
+    required this.icon,
+    required this.size,
+    required this.colors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size + 8,
+      height: size + 9,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 5,
+            top: 6,
+            child: Icon(
+              icon,
+              size: size,
+              color: const Color(0xFF17345E),
+            ),
+          ),
+          Positioned(
+            left: 3,
+            top: 4,
+            child: Icon(
+              icon,
+              size: size,
+              color: const Color(0xFF476D9F),
+            ),
+          ),
+          ShaderMask(
+            shaderCallback: (bounds) => LinearGradient(
+              colors: colors,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ).createShader(bounds),
+            blendMode: BlendMode.srcIn,
+            child: Icon(
+              icon,
+              size: size,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _LearningBanner extends StatelessWidget {
   const _LearningBanner();
 
@@ -1009,14 +1243,24 @@ class _LearningBanner extends StatelessWidget {
       height: 166,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF0E3F87), Color(0xFF1469D6)],
+          colors: [
+            Color(0xFF0E3F87),
+            Color(0xFF1469D6),
+            Color(0xFF377BF2),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(22),
-        boxShadow: const [BoxShadow(color: Color(0x332563EB), blurRadius: 18, offset: Offset(0, 10))],
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x332563EB),
+            blurRadius: 18,
+            offset: Offset(0, 10),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.all(15),
+      padding: const EdgeInsets.fromLTRB(15, 14, 15, 14),
       child: Row(
         children: [
           const Expanded(
@@ -1024,23 +1268,96 @@ class _LearningBanner extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Small Steps', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
-                Text('Big Results', style: TextStyle(color: Color(0xFF69E4FF), fontSize: 20, fontWeight: FontWeight.w900)),
+                Text(
+                  'Small Steps',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  'Big Results',
+                  style: TextStyle(
+                    color: Color(0xFF69E4FF),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
                 SizedBox(height: 5),
-                Text('Learn today for a brighter tomorrow.', style: TextStyle(color: Colors.white70, fontSize: 11.2)),
+                Text(
+                  'Learn today for a brighter tomorrow.',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11.2,
+                  ),
+                ),
                 SizedBox(height: 9),
                 _BannerButton(),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          const Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('🏆', style: TextStyle(fontSize: 34)),
-              SizedBox(height: 2),
-              Text('📚', style: TextStyle(fontSize: 26)),
-            ],
+          const SizedBox(width: 5),
+          const SizedBox(
+            width: 88,
+            height: 132,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned(
+                  top: 0,
+                  left: 30,
+                  child: _TutorAi3DIcon(
+                    icon: Icons.emoji_events_rounded,
+                    size: 45,
+                    colors: [
+                      Color(0xFFFFF176),
+                      Color(0xFFFFC107),
+                      Color(0xFFFF8F00),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  top: 48,
+                  left: 2,
+                  child: _TutorAi3DIcon(
+                    icon: Icons.menu_book_rounded,
+                    size: 54,
+                    colors: [
+                      Color(0xFF77C2FF),
+                      Color(0xFF2085F5),
+                      Color(0xFF0B5ED7),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  top: 60,
+                  left: 8,
+                  child: _TutorAi3DIcon(
+                    icon: Icons.menu_book_rounded,
+                    size: 54,
+                    colors: [
+                      Color(0xFF86EAA8),
+                      Color(0xFF23B95C),
+                      Color(0xFF128A43),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  top: 69,
+                  left: 14,
+                  child: _TutorAi3DIcon(
+                    icon: Icons.menu_book_rounded,
+                    size: 54,
+                    colors: [
+                      Color(0xFFD0A4FF),
+                      Color(0xFF8C4DFF),
+                      Color(0xFF5D22D2),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1055,57 +1372,156 @@ class _BannerButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)),
-      child: const Text('Keep Learning  →', style: TextStyle(color: Color(0xFF0E3F87), fontWeight: FontWeight.w900, fontSize: 11.5)),
-    );
-  }
-}
-
-class _ProgressCard extends StatelessWidget {
-  const _ProgressCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 166,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), boxShadow: _softShadow()),
-      child: Row(
-        children: [
-          SizedBox(
-            height: 76,
-            width: 76,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                const CircularProgressIndicator(
-                  value: 0.74,
-                  strokeWidth: 8,
-                  backgroundColor: Color(0xFFE7EEF9),
-                  valueColor: AlwaysStoppedAnimation(Color(0xFF1C9E70)),
-                ),
-                const Text('74%', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF14213D))),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Your Learning Progress', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF14213D))),
-                SizedBox(height: 9),
-                _ProgressLine(name: 'Mathematics', value: '78%', progress: 0.78),
-                SizedBox(height: 6),
-                _ProgressLine(name: 'Science', value: '64%', progress: 0.64),
-                SizedBox(height: 6),
-                _ProgressLine(name: 'English', value: '71%', progress: 0.71),
-              ],
-            ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(13),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x302563EB),
+            blurRadius: 8,
+            offset: Offset(0, 4),
           ),
         ],
       ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Keep Learning',
+            style: TextStyle(
+              color: Color(0xFF0E3F87),
+              fontWeight: FontWeight.w900,
+              fontSize: 11.5,
+            ),
+          ),
+          SizedBox(width: 6),
+          const Icon(
+            Icons.arrow_forward_rounded,
+            size: 18,
+            color: Color(0xFF246BFD),
+          ),
+        ],
+      ),
+    );
+  }
+}
+class _ProgressCard extends StatelessWidget {
+  const _ProgressCard();
+
+  double _subjectAccuracy(
+    Map<String, List<_ProgressSession>> groups,
+    String subject,
+  ) {
+    final normalizedSubject = subject.trim().toLowerCase();
+
+    for (final entry in groups.entries) {
+      if (entry.key.trim().toLowerCase() != normalizedSubject) continue;
+
+      final sessions = entry.value;
+      final total = sessions.fold<int>(
+        0,
+        (sum, session) => sum + session.total,
+      );
+      final correct = sessions.fold<int>(
+        0,
+        (sum, session) => sum + session.correct,
+      );
+
+      if (total == 0) return 0.0;
+      return correct / total;
+    }
+
+    return 0.0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: tutorProgress,
+      builder: (context, _) {
+        final grouped = tutorProgress.sessionsBySubject;
+        final overallProgress = tutorProgress.accuracy / 100.0;
+
+        final mathematics = _subjectAccuracy(grouped, 'Mathematics');
+        final science = _subjectAccuracy(grouped, 'Science');
+        final english = _subjectAccuracy(grouped, 'English');
+
+        return Container(
+          height: 166,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: _softShadow(),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                height: 76,
+                width: 76,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      value: overallProgress,
+                      strokeWidth: 8,
+                      backgroundColor: const Color(0xFFE7EEF9),
+                      valueColor: const AlwaysStoppedAnimation(
+                        Color(0xFF1C9E70),
+                      ),
+                    ),
+                    Text(
+                      '${tutorProgress.accuracy}%',
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF14213D),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Your Learning Progress',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF14213D),
+                      ),
+                    ),
+                    const SizedBox(height: 9),
+                    _ProgressLine(
+                      name: 'Mathematics',
+                      value: '${(mathematics * 100).round()}%',
+                      progress: mathematics,
+                    ),
+                    const SizedBox(height: 6),
+                    _ProgressLine(
+                      name: 'Science',
+                      value: '${(science * 100).round()}%',
+                      progress: science,
+                    ),
+                    const SizedBox(height: 6),
+                    _ProgressLine(
+                      name: 'English',
+                      value: '${(english * 100).round()}%',
+                      progress: english,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -1114,7 +1530,8 @@ class _ProgressLine extends StatelessWidget {
   final String name;
   final String value;
   final double progress;
-  const _ProgressLine({required this.name, required this.value, required this.progress});
+  const _ProgressLine(
+      {required this.name, required this.value, required this.progress});
 
   @override
   Widget build(BuildContext context) {
@@ -1123,15 +1540,27 @@ class _ProgressLine extends StatelessWidget {
       children: [
         Row(
           children: [
-            Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, color: Color(0xFF53657E)))),
+            Expanded(
+                child: Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 10.5, color: Color(0xFF53657E)))),
             const SizedBox(width: 4),
-            Text(value, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF2C5AA0))),
+            Text(value,
+                style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF2C5AA0))),
           ],
         ),
         const SizedBox(height: 3),
         ClipRRect(
           borderRadius: BorderRadius.circular(20),
-          child: LinearProgressIndicator(value: progress, minHeight: 6, backgroundColor: const Color(0xFFEAF0F7)),
+          child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 6,
+              backgroundColor: const Color(0xFFEAF0F7)),
         ),
       ],
     );
@@ -1141,14 +1570,38 @@ class _ProgressLine extends StatelessWidget {
 class _SectionHeader extends StatelessWidget {
   final String title;
   final String action;
-  const _SectionHeader({required this.title, required this.action});
+  final VoidCallback? onActionTap;
+  const _SectionHeader({
+    required this.title,
+    required this.action,
+    this.onActionTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: Text(title, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: Color(0xFF14213D)))),
-        Text(action, style: const TextStyle(color: Color(0xFF1664DC), fontWeight: FontWeight.w800)),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF14213D),
+            ),
+          ),
+        ),
+        if (action.isNotEmpty)
+          GestureDetector(
+            onTap: onActionTap,
+            child: Text(
+              action,
+              style: const TextStyle(
+                color: Color(0xFF1664DC),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -1160,7 +1613,8 @@ class _CourseData {
   final double progress;
   final IconData icon;
   final Color color;
-  const _CourseData(this.title, this.topic, this.progress, this.icon, this.color);
+  const _CourseData(
+      this.title, this.topic, this.progress, this.icon, this.color);
 }
 
 class _CourseCard extends StatelessWidget {
@@ -1172,13 +1626,18 @@ class _CourseCard extends StatelessWidget {
     return Container(
       width: 224,
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), boxShadow: _softShadow()),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: _softShadow()),
       child: Row(
         children: [
           Container(
             height: 48,
             width: 48,
-            decoration: BoxDecoration(color: data.color.withValues(alpha: 0.13), borderRadius: BorderRadius.circular(14)),
+            decoration: BoxDecoration(
+                color: data.color.withValues(alpha: 0.13),
+                borderRadius: BorderRadius.circular(14)),
             child: Icon(data.icon, color: data.color, size: 27),
           ),
           const SizedBox(width: 11),
@@ -1187,19 +1646,37 @@ class _CourseCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(data.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14.5, color: Color(0xFF17243C))),
+                Text(data.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14.5,
+                        color: Color(0xFF17243C))),
                 const SizedBox(height: 3),
-                Text(data.topic, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Color(0xFF66758A))),
+                Text(data.topic,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF66758A))),
                 const SizedBox(height: 6),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(20),
-                  child: LinearProgressIndicator(value: data.progress, minHeight: 6, backgroundColor: const Color(0xFFEAF0F7), valueColor: AlwaysStoppedAnimation(data.color)),
+                  child: LinearProgressIndicator(
+                      value: data.progress,
+                      minHeight: 6,
+                      backgroundColor: const Color(0xFFEAF0F7),
+                      valueColor: AlwaysStoppedAnimation(data.color)),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 5),
-          Text('${(data.progress * 100).round()}%', style: TextStyle(color: data.color, fontWeight: FontWeight.w800, fontSize: 10.5)),
+          Text('${(data.progress * 100).round()}%',
+              style: TextStyle(
+                  color: data.color,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 10.5)),
         ],
       ),
     );
@@ -1315,7 +1792,8 @@ class _AskTutorAIScreenState extends State<AskTutorAIScreen> {
     });
 
     final conversation = _messages
-        .map((message) => '${message.fromUser ? 'Student' : 'TutorAI'}: ${message.text}')
+        .map((message) =>
+            '${message.fromUser ? 'Student' : 'TutorAI'}: ${message.text}')
         .toList();
 
     // Ask TutorAI is a general-purpose tutor chat. It must not force the
@@ -1362,7 +1840,8 @@ class _AskTutorAIScreenState extends State<AskTutorAIScreen> {
       }
     }
     buffer.writeln();
-    buffer.write('Tell me exactly which step or part you do not understand, and I will explain that part again.');
+    buffer.write(
+        'Tell me exactly which step or part you do not understand, and I will explain that part again.');
     return buffer.toString();
   }
 
@@ -1371,19 +1850,24 @@ class _AskTutorAIScreenState extends State<AskTutorAIScreen> {
     final match = RegExp(r'(?:step\s*)?(\d+)').firstMatch(q);
     final requested = match == null ? null : int.tryParse(match.group(1)!);
 
-    if (requested != null && requested >= 1 && requested <= solution.steps.length) {
+    if (requested != null &&
+        requested >= 1 &&
+        requested <= solution.steps.length) {
       final step = solution.steps[requested - 1];
-      return 'Let’s go back to Step $requested.\n\n${step.body}\n\nWhy we do it:\n${step.why}\n\nTell me the exact word, number, or operation that is still confusing.';
+      return 'Letâ€™s go back to Step $requested.\n\n${step.body}\n\nWhy we do it:\n${step.why}\n\nTell me the exact word, number, or operation that is still confusing.';
     }
 
     if (q.contains('another') || q.contains('example')) {
       return 'Here is another example using the same idea:\n\n${solution.example}\n\nTry it yourself, then tell me where you get stuck.';
     }
 
-    if (q.contains('why') || q.contains('how') || q.contains('understand') || q.contains('stuck')) {
+    if (q.contains('why') ||
+        q.contains('how') ||
+        q.contains('understand') ||
+        q.contains('stuck')) {
       final step = solution.steps.isEmpty ? null : solution.steps.first;
       if (step != null) {
-        return 'Let’s slow it down.\n\n${step.body}\n\nWhy:\n${step.why}\n\nIf that is not the part you mean, tell me the exact number or step where you are stuck.';
+        return 'Letâ€™s slow it down.\n\n${step.body}\n\nWhy:\n${step.why}\n\nIf that is not the part you mean, tell me the exact number or step where you are stuck.';
       }
     }
 
@@ -1482,11 +1966,13 @@ class _AskTutorAIScreenState extends State<AskTutorAIScreen> {
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(18),
-                          borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFDDE6F2)),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(18),
-                          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.4),
+                          borderSide: const BorderSide(
+                              color: Color(0xFF2563EB), width: 1.4),
                         ),
                       ),
                     ),
@@ -1653,9 +2139,11 @@ class _AskTutorBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bubbleColor = message.fromUser ? const Color(0xFF2563EB) : Colors.white;
+    final bubbleColor =
+        message.fromUser ? const Color(0xFF2563EB) : Colors.white;
     final textColor = message.fromUser ? Colors.white : const Color(0xFF24334B);
-    final alignment = message.fromUser ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+    final alignment =
+        message.fromUser ? CrossAxisAlignment.end : CrossAxisAlignment.start;
 
     return Column(
       crossAxisAlignment: alignment,
@@ -1707,81 +2195,70 @@ class SnapQuestionScreen extends StatefulWidget {
 }
 
 class _SnapQuestionScreenState extends State<SnapQuestionScreen> {
-  final ImagePicker _picker = ImagePicker();
+  DocumentScanner? _scanner;
   bool _busy = false;
+  bool _openedAutomatically = false;
 
-  Future<void> _choosePictureSource() async {
-    if (_busy) return;
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 42,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFD4DCE8),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              const SizedBox(height: 18),
-              const Text(
-                'Choose a picture source',
-                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: Color(0xFF14213D)),
-              ),
-              const SizedBox(height: 12),
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFE2EEFF),
-                  child: Icon(Icons.camera_alt_rounded, color: Color(0xFF2563EB)),
-                ),
-                title: const Text('Take a Picture', style: TextStyle(fontWeight: FontWeight.w800)),
-                subtitle: const Text('Use your phone camera'),
-                onTap: () => Navigator.pop(context, ImageSource.camera),
-              ),
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFECE6FF),
-                  child: Icon(Icons.photo_library_rounded, color: Color(0xFF7C3AED)),
-                ),
-                title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w800)),
-                subtitle: const Text('Select an existing picture'),
-                onTap: () => Navigator.pop(context, ImageSource.gallery),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (source == null || !mounted) return;
-    await _pickPicture(source);
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _openedAutomatically) return;
+      _openedAutomatically = true;
+      _scanQuestion();
+    });
   }
 
-  Future<void> _pickPicture(ImageSource source) async {
+  Future<void> _scanQuestion() async {
+    if (_busy) return;
+
     setState(() => _busy = true);
+
+    final scanner = DocumentScanner(
+      options: DocumentScannerOptions(
+        documentFormats: {DocumentFormat.jpeg},
+        pageLimit: 1,
+        mode: ScannerMode.full,
+        isGalleryImport: true,
+      ),
+    );
+
+    _scanner = scanner;
+
     try {
-      final image = await _picker.pickImage(source: source, imageQuality: 88);
+      final result = await scanner.scanDocument();
+      final images = result.images ?? const <String>[];
+
       if (!mounted) return;
-      setState(() => _busy = false);
-      if (image != null) {
-        _openQuestionComposer(image: image);
+
+      if (images.isEmpty) {
+        setState(() => _busy = false);
+        return;
       }
-    } catch (_) {
-      if (!mounted) return;
+
       setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(source == ImageSource.camera
-            ? 'We could not open the camera. Please try again.'
-            : 'We could not open the gallery. Please try again.')),
+
+      _openQuestionComposer(
+        image: XFile(images.first),
       );
+    } catch (error) {
+      debugPrint('TutorAI DOCUMENT SCANNER ERROR: $error');
+
+      if (!mounted) return;
+
+      setState(() => _busy = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'We could not open the question scanner. Please try again.',
+          ),
+        ),
+      );
+    } finally {
+      await scanner.close();
+      _scanner = null;
     }
   }
 
@@ -1791,6 +2268,12 @@ class _SnapQuestionScreenState extends State<SnapQuestionScreen> {
         builder: (_) => QuestionComposerScreen(image: image),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _scanner?.close();
+    super.dispose();
   }
 
   @override
@@ -1806,7 +2289,7 @@ class _SnapQuestionScreenState extends State<SnapQuestionScreen> {
           padding: const EdgeInsets.fromLTRB(18, 22, 18, 28),
           children: [
             const Text(
-              'How would you like to ask?',
+              'Scan your question',
               style: TextStyle(
                 fontSize: 25,
                 fontWeight: FontWeight.w900,
@@ -1815,7 +2298,7 @@ class _SnapQuestionScreenState extends State<SnapQuestionScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Take a picture of your question or type it yourself. TutorAI will explain it step-by-step.',
+              'Point your camera at the question. TutorAI will scan the page and read the question for you.',
               style: TextStyle(
                 fontSize: 14,
                 height: 1.45,
@@ -1823,40 +2306,46 @@ class _SnapQuestionScreenState extends State<SnapQuestionScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            _QuestionChoiceCard(
-              icon: Icons.camera_alt_rounded,
-              title: 'Take a Picture',
-              subtitle: 'Photograph a homework question, worksheet, or textbook problem.',
-              iconBackground: const Color(0xFFE2EEFF),
-              iconColor: const Color(0xFF2563EB),
-              onTap: _busy ? null : _choosePictureSource,
-              busy: _busy,
+            SizedBox(
+              height: 56,
+              child: ElevatedButton.icon(
+                onPressed: _busy ? null : _scanQuestion,
+                icon: const Icon(Icons.document_scanner_rounded),
+                label: Text(
+                  _busy ? 'Scanner Open...' : 'Scan a Question',
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 52,
+              child: OutlinedButton.icon(
+                onPressed: _busy ? null : () => _openQuestionComposer(),
+                icon: const Icon(Icons.keyboard_rounded),
+                label: const Text('Type Your Question Instead'),
+              ),
             ),
             const SizedBox(height: 16),
-            _QuestionChoiceCard(
-              icon: Icons.keyboard_rounded,
-              title: 'Type Your Question',
-              subtitle: 'Type a maths, science, English, or any other school question.',
-              iconBackground: const Color(0xFFF0E8FF),
-              iconColor: const Color(0xFF7C3AED),
-              onTap: _busy ? null : () => _openQuestionComposer(),
-            ),
-            const SizedBox(height: 24),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFE1E8F4)),
+                border: Border.all(
+                  color: const Color(0xFFE1E8F4),
+                ),
               ),
               child: const Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.auto_awesome_rounded, color: Color(0xFF2563EB)),
+                  Icon(
+                    Icons.auto_awesome_rounded,
+                    color: Color(0xFF2563EB),
+                  ),
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'TutorAI will identify the question type and teach the solution instead of only giving the answer.',
+                      'After the scan, TutorAI reads the question into an editable box so you can correct the text before solving.',
                       style: TextStyle(
                         fontSize: 12.5,
                         height: 1.45,
@@ -1868,104 +2357,6 @@ class _SnapQuestionScreenState extends State<SnapQuestionScreen> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _QuestionChoiceCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color iconBackground;
-  final Color iconColor;
-  final VoidCallback? onTap;
-  final bool busy;
-
-  const _QuestionChoiceCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.iconBackground,
-    required this.iconColor,
-    required this.onTap,
-    this.busy = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(22),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: const Color(0xFFDDE6F2)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x1422446B),
-                blurRadius: 14,
-                offset: Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 62,
-                height: 62,
-                decoration: BoxDecoration(
-                  color: iconBackground,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Center(
-                  child: busy && title == 'Take a Picture'
-                      ? const SizedBox(
-                          width: 26,
-                          height: 26,
-                          child: CircularProgressIndicator(strokeWidth: 3),
-                        )
-                      : Icon(icon, color: iconColor, size: 30),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF14213D),
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        height: 1.4,
-                        color: Color(0xFF5E6D81),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: Color(0xFF91A1B8),
-                size: 28,
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -2003,7 +2394,8 @@ class _QuestionComposerScreenState extends State<QuestionComposerScreen> {
     if (!mounted) return;
     setState(() => _analyzing = false);
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => QuestionResultScreen(solution: solution)),
+      MaterialPageRoute(
+          builder: (_) => QuestionResultScreen(solution: solution)),
     );
   }
 
@@ -2059,7 +2451,9 @@ class _QuestionComposerScreenState extends State<QuestionComposerScreen> {
           _imagePreview(),
           const SizedBox(height: 18),
           Text(
-            fromPhoto ? 'Confirm the question' : 'What would you like to learn?',
+            fromPhoto
+                ? 'Confirm the question'
+                : 'What would you like to learn?',
             style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w900,
@@ -2097,7 +2491,8 @@ class _QuestionComposerScreenState extends State<QuestionComposerScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
-                borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+                borderSide:
+                    const BorderSide(color: Color(0xFF2563EB), width: 1.5),
               ),
             ),
           ),
@@ -2116,7 +2511,8 @@ class _QuestionComposerScreenState extends State<QuestionComposerScreen> {
                       ),
                     )
                   : const Icon(Icons.auto_awesome_rounded),
-              label: Text(_analyzing ? 'Analyzing...' : 'Teach Me Step-by-Step'),
+              label:
+                  Text(_analyzing ? 'Analyzing...' : 'Teach Me Step-by-Step'),
             ),
           ),
         ],
@@ -2124,7 +2520,6 @@ class _QuestionComposerScreenState extends State<QuestionComposerScreen> {
     );
   }
 }
-
 
 // ---------------------------------------------------------------------------
 // TUTORAI BACKEND BRIDGE
@@ -2190,8 +2585,8 @@ class TutorBackendClient {
 
     try {
       final request = await client.postUrl(_uri('/v1/tutor')).timeout(
-        const Duration(seconds: 10),
-      );
+            const Duration(seconds: 10),
+          );
       request.headers.contentType = ContentType.json;
       request.headers.set('Accept', 'application/json');
       request.write(jsonEncode({
@@ -2207,8 +2602,8 @@ class TutorBackendClient {
       }));
 
       final response = await request.close().timeout(
-        const Duration(seconds: 30),
-      );
+            const Duration(seconds: 30),
+          );
       final body = await utf8.decoder.bind(response).join();
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -2245,8 +2640,8 @@ class TutorBackendClient {
       debugPrint('TutorAI CHAT: POST $uri');
 
       final request = await client.postUrl(uri).timeout(
-        const Duration(seconds: 10),
-      );
+            const Duration(seconds: 10),
+          );
       request.headers.contentType = ContentType.json;
       request.headers.set('Accept', 'text/event-stream');
       request.write(jsonEncode({
@@ -2256,8 +2651,8 @@ class TutorBackendClient {
       }));
 
       final response = await request.close().timeout(
-        const Duration(seconds: 30),
-      );
+            const Duration(seconds: 30),
+          );
 
       debugPrint('TutorAI CHAT: HTTP ${response.statusCode}');
 
@@ -2269,9 +2664,8 @@ class TutorBackendClient {
 
       final chunks = <String>[];
 
-      await for (final line in utf8.decoder
-          .bind(response)
-          .transform(const LineSplitter())) {
+      await for (final line
+          in utf8.decoder.bind(response).transform(const LineSplitter())) {
         if (!line.startsWith('data:')) continue;
 
         final data = line.substring(5).trim();
@@ -2331,8 +2725,8 @@ class TutorBackendClient {
 
     try {
       final request = await client.postUrl(_uri('/v1/tutor/follow-up')).timeout(
-        const Duration(seconds: 10),
-      );
+            const Duration(seconds: 10),
+          );
       request.headers.contentType = ContentType.json;
       request.headers.set('Accept', 'application/json');
       request.write(jsonEncode({
@@ -2355,8 +2749,8 @@ class TutorBackendClient {
       }));
 
       final response = await request.close().timeout(
-        const Duration(seconds: 30),
-      );
+            const Duration(seconds: 30),
+          );
       final body = await utf8.decoder.bind(response).join();
       if (response.statusCode < 200 || response.statusCode >= 300) return null;
 
@@ -2429,8 +2823,7 @@ bool _looksLikeMathQuestion(String question) {
   if (text.isEmpty) return false;
 
   // Clear mathematical structures should use the structured lesson endpoint.
-  if (RegExp(r'\d').hasMatch(text) &&
-      RegExp(r'[+\-*/%=]').hasMatch(text)) {
+  if (RegExp(r'\d').hasMatch(text) && RegExp(r'[+\-*/%=]').hasMatch(text)) {
     return true;
   }
 
@@ -2481,11 +2874,13 @@ TutorSolution _generalLearningSolution(String question, String reply) {
       TutorStepData(
         title: 'Explanation',
         body: cleanReply,
-        why: 'TutorAI answers the exact subject and question the student asked, rather than forcing a mathematical method onto a non-mathematical question.',
+        why:
+            'TutorAI answers the exact subject and question the student asked, rather than forcing a mathematical method onto a non-mathematical question.',
       ),
     ],
     answer: cleanReply,
-    methodSummary: 'TutorAI identified this as a general academic question and explained the topic directly at the student level.',
+    methodSummary:
+        'TutorAI identified this as a general academic question and explained the topic directly at the student level.',
     example: 'Ask: "Can you give me a simple example?" for a related example.',
     supported: true,
   );
@@ -2589,11 +2984,13 @@ int _gcd(int a, int b) {
 
 _SimpleFraction _fractionAdd(_SimpleFraction a, _SimpleFraction b) =>
     _SimpleFraction(a.numerator * b.denominator + b.numerator * a.denominator,
-        a.denominator * b.denominator).normalized();
+            a.denominator * b.denominator)
+        .normalized();
 
 _SimpleFraction _fractionSubtract(_SimpleFraction a, _SimpleFraction b) =>
     _SimpleFraction(a.numerator * b.denominator - b.numerator * a.denominator,
-        a.denominator * b.denominator).normalized();
+            a.denominator * b.denominator)
+        .normalized();
 
 _SimpleFraction _fractionMultiply(_SimpleFraction a, _SimpleFraction b) =>
     _SimpleFraction(a.numerator * b.numerator, a.denominator * b.denominator)
@@ -2613,9 +3010,12 @@ _SimpleFraction? _parseFraction(String text) {
 
 String _normalizeQuestion(String raw) {
   var q = raw.trim();
-  q = q.replaceAll('×', '*').replaceAll('÷', '/').replaceAll('−', '-');
+  q = q.replaceAll('Ã—', '*').replaceAll('Ã·', '/').replaceAll('âˆ’', '-');
   q = q.replaceAll(RegExp(r'\s+'), ' ');
-  q = q.replaceAll(RegExp(r'^(what is|calculate|solve|find|work out|please calculate)\s+', caseSensitive: false), '');
+  q = q.replaceAll(
+      RegExp(r'^(what is|calculate|solve|find|work out|please calculate)\s+',
+          caseSensitive: false),
+      '');
   q = q.replaceAll(RegExp(r'\?+$'), '').trim();
   q = q.replaceAllMapped(
     RegExp(r'(?<=\d)\s+(?=\d(?:\s*[+\-*/]\s*|$))'),
@@ -2638,7 +3038,6 @@ String _normalizeQuestion(String raw) {
   return q.trim();
 }
 
-
 class _AdvancedExpressionResult {
   final double value;
   final List<String> steps;
@@ -2657,7 +3056,9 @@ List<String> _tokenizeMathExpression(String expression) {
 
   while (i < compact.length) {
     final char = compact[i];
-    if (RegExp(r'\d|\.',).hasMatch(char)) {
+    if (RegExp(
+      r'\d|\.',
+    ).hasMatch(char)) {
       var j = i;
       var dots = 0;
       while (j < compact.length && RegExp(r'\d|\.').hasMatch(compact[j])) {
@@ -2783,22 +3184,26 @@ TutorSolution _unsupportedSolution(String cleaned) {
     steps: const [
       TutorStepData(
         title: 'Read the question carefully',
-        body: 'TutorAI needs the exact wording or a supported mathematical structure before it can teach the solution accurately.',
-        why: 'A good tutor should never invent a method when the question is unclear. Accurate teaching starts with understanding exactly what the student was asked.',
+        body:
+            'TutorAI needs the exact wording or a supported mathematical structure before it can teach the solution accurately.',
+        why:
+            'A good tutor should never invent a method when the question is unclear. Accurate teaching starts with understanding exactly what the student was asked.',
       ),
       TutorStepData(
         title: 'Give the question in a clear format',
-        body: 'Examples:\n\n12.5 + 3.75\n2(4 + 3)\n1/2 + 1/4\n25% of 80\n2x + 5 = 15\naverage of 12, 18, 20',
-        why: 'A clear mathematical structure lets TutorAI identify the method, show the working, and explain why each step is valid.',
+        body:
+            'Examples:\n\n12.5 + 3.75\n2(4 + 3)\n1/2 + 1/4\n25% of 80\n2x + 5 = 15\naverage of 12, 18, 20',
+        why:
+            'A clear mathematical structure lets TutorAI identify the method, show the working, and explain why each step is valid.',
       ),
     ],
     answer: 'Need a clearer or currently unsupported question',
-    methodSummary: 'TutorAI will only present a worked solution when it can identify the mathematical structure reliably.',
+    methodSummary:
+        'TutorAI will only present a worked solution when it can identify the mathematical structure reliably.',
     example: 'Try: 12.5 + 3.75',
     supported: false,
   );
 }
-
 
 // ---------------------------------------------------------------------------
 // ADVANCED PEDAGOGICAL ENGINE
@@ -2870,31 +3275,40 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
       };
       return TutorSolution(
         question: cleaned,
-        topic: 'Mixed Number ${op == '+' ? 'Addition' : op == '-' ? 'Subtraction' : op == '*' ? 'Multiplication' : 'Division'}',
+        topic:
+            'Mixed Number ${op == '+' ? 'Addition' : op == '-' ? 'Subtraction' : op == '*' ? 'Multiplication' : 'Division'}',
         steps: [
           TutorStepData(
             title: 'Understand the mixed numbers',
-            body: '${a.display} and ${b.display} each contain a whole-number part and a fractional part.',
-            why: 'A mixed number combines whole units with part of another unit. Converting to improper fractions lets us use one consistent fraction rule.',
+            body:
+                '${a.display} and ${b.display} each contain a whole-number part and a fractional part.',
+            why:
+                'A mixed number combines whole units with part of another unit. Converting to improper fractions lets us use one consistent fraction rule.',
           ),
           TutorStepData(
             title: 'Convert to improper fractions',
-            body: '${a.display} = ${af.display}\n${b.display} = ${bf.display}\n\nFor a mixed number, multiply the whole number by the denominator, add the numerator, then keep the same denominator.',
-            why: 'This preserves the value while turning the mixed number into a single fraction that is easier to operate on.',
+            body:
+                '${a.display} = ${af.display}\n${b.display} = ${bf.display}\n\nFor a mixed number, multiply the whole number by the denominator, add the numerator, then keep the same denominator.',
+            why:
+                'This preserves the value while turning the mixed number into a single fraction that is easier to operate on.',
           ),
           TutorStepData(
             title: 'Perform the fraction operation',
-            body: '${af.display} ${op == '/' ? '÷' : op} ${bf.display} = ${result.display}.',
-            why: 'Now the problem follows the normal fraction operation rule for $op.',
+            body:
+                '${af.display} ${op == '/' ? 'Ã·' : op} ${bf.display} = ${result.display}.',
+            why:
+                'Now the problem follows the normal fraction operation rule for $op.',
           ),
           TutorStepData(
             title: 'Interpret the result',
             body: 'The simplified answer is ${result.display}.',
-            why: 'Reducing the fraction gives the student the cleanest exact form of the result.',
+            why:
+                'Reducing the fraction gives the student the cleanest exact form of the result.',
           ),
         ],
         answer: result.display,
-        methodSummary: 'Convert mixed numbers to improper fractions, apply the fraction operation, simplify, then interpret the result.',
+        methodSummary:
+            'Convert mixed numbers to improper fractions, apply the fraction operation, simplify, then interpret the result.',
         example: '1 1/2 + 2 1/4 = 3 3/4',
         supported: true,
       );
@@ -2911,7 +3325,7 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
     final power = int.parse(exponent.group(2)!);
     final base = double.parse(baseText);
     final value = math.pow(base, power).toDouble();
-    final repeated = List.filled(power, baseText).join(' × ');
+    final repeated = List.filled(power, baseText).join(' Ã— ');
     return TutorSolution(
       question: cleaned,
       topic: 'Exponents and Powers',
@@ -2919,28 +3333,33 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
         TutorStepData(
           title: 'Identify the base and exponent',
           body: 'Base = $baseText\nExponent = $power',
-          why: 'The base is the number being multiplied, while the exponent tells us how many times the base is used as a factor.',
+          why:
+              'The base is the number being multiplied, while the exponent tells us how many times the base is used as a factor.',
         ),
         TutorStepData(
           title: 'Rewrite as repeated multiplication',
           body: '$baseText^$power = $repeated',
-          why: 'An exponent is shorthand for repeated multiplication of the same base.',
+          why:
+              'An exponent is shorthand for repeated multiplication of the same base.',
         ),
         TutorStepData(
           title: 'Multiply step-by-step',
           body: _formatNumber(base) == baseText
               ? '${_formatNumber(value)} is the result of multiplying the $power factors.'
               : '$repeated = ${_formatNumber(value)}',
-          why: 'Each multiplication builds the next power while preserving the exact value.',
+          why:
+              'Each multiplication builds the next power while preserving the exact value.',
         ),
         TutorStepData(
           title: 'Check the size',
           body: 'The exact answer is ${_formatNumber(value)}.',
-          why: 'For a positive base greater than 1, increasing the exponent should make the result grow quickly.',
+          why:
+              'For a positive base greater than 1, increasing the exponent should make the result grow quickly.',
         ),
       ],
       answer: _formatNumber(value),
-      methodSummary: 'Identify base and exponent, expand the power into repeated multiplication, calculate, then check the size.',
+      methodSummary:
+          'Identify base and exponent, expand the power into repeated multiplication, calculate, then check the size.',
       example: '3^2 = 9',
       supported: true,
     );
@@ -2960,12 +3379,15 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
         steps: const [
           TutorStepData(
             title: 'Check the number inside the root',
-            body: 'The principal square root of a negative number is not a real number.',
-            why: 'A real number squared is never negative, so no real number can square to a negative value.',
+            body:
+                'The principal square root of a negative number is not a real number.',
+            why:
+                'A real number squared is never negative, so no real number can square to a negative value.',
           ),
         ],
         answer: 'No real solution',
-        methodSummary: 'For a real square root, the number under the radical must be non-negative.',
+        methodSummary:
+            'For a real square root, the number under the radical must be non-negative.',
         example: 'sqrt 49 = 7',
         supported: true,
       );
@@ -2979,24 +3401,30 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
       steps: [
         TutorStepData(
           title: 'Understand the question',
-          body: 'We are looking for a number that multiplies by itself to make $rootTextFor(radicand).',
-          why: 'A square root reverses squaring: √n asks which number has square n.',
+          body:
+              'We are looking for a number that multiplies by itself to make $rootTextFor(radicand).',
+          why:
+              'A square root reverses squaring: âˆšn asks which number has square n.',
         ),
         TutorStepData(
           title: 'Find the matching square',
           body: exactSquare
-              ? '${rounded.toInt()} × ${rounded.toInt()} = ${_formatNumber(radicand)}'
-              : '√${_formatNumber(radicand)} ≈ ${_formatNumber(value)}',
-          why: 'The answer is the number whose square is the value under the root.',
+              ? '${rounded.toInt()} Ã— ${rounded.toInt()} = ${_formatNumber(radicand)}'
+              : 'âˆš${_formatNumber(radicand)} â‰ˆ ${_formatNumber(value)}',
+          why:
+              'The answer is the number whose square is the value under the root.',
         ),
         TutorStepData(
           title: 'Check by squaring',
-          body: '${_formatNumber(value)} × ${_formatNumber(value)} ≈ ${_formatNumber(value * value)}.',
-          why: 'Squaring the result should return the original radicand, allowing a direct inverse-operation check.',
+          body:
+              '${_formatNumber(value)} Ã— ${_formatNumber(value)} â‰ˆ ${_formatNumber(value * value)}.',
+          why:
+              'Squaring the result should return the original radicand, allowing a direct inverse-operation check.',
         ),
       ],
       answer: _formatNumber(value),
-      methodSummary: 'Find the number whose square equals the radicand, then verify by squaring the result.',
+      methodSummary:
+          'Find the number whose square equals the radicand, then verify by squaring the result.',
       example: 'sqrt 64 = 8',
       supported: true,
     );
@@ -3024,22 +3452,28 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
       steps: [
         TutorStepData(
           title: 'Understand GCF',
-          body: 'We want the largest whole number that divides both $a and $b with no remainder.',
-          why: 'The word “common” means it works for both numbers, and “greatest” means we choose the largest such factor.',
+          body:
+              'We want the largest whole number that divides both $a and $b with no remainder.',
+          why:
+              'The word â€œcommonâ€ means it works for both numbers, and â€œgreatestâ€ means we choose the largest such factor.',
         ),
         TutorStepData(
           title: 'Use the remainder process',
-          body: 'Apply the Euclidean algorithm to repeatedly replace the larger number with the remainder until the remainder is 0.\n\nGCF = $g.',
-          why: 'Common factors are preserved through the remainder process, so the last non-zero remainder is the greatest common factor.',
+          body:
+              'Apply the Euclidean algorithm to repeatedly replace the larger number with the remainder until the remainder is 0.\n\nGCF = $g.',
+          why:
+              'Common factors are preserved through the remainder process, so the last non-zero remainder is the greatest common factor.',
         ),
         TutorStepData(
           title: 'Check the factors',
           body: '$g divides $a and $b exactly.',
-          why: 'A final factor check confirms that the result is common to both numbers.',
+          why:
+              'A final factor check confirms that the result is common to both numbers.',
         ),
       ],
       answer: g.toString(),
-      methodSummary: 'Use the Euclidean algorithm and verify that the final factor divides both numbers.',
+      methodSummary:
+          'Use the Euclidean algorithm and verify that the final factor divides both numbers.',
       example: 'GCF of 18 and 24 = 6',
       supported: true,
     );
@@ -3068,22 +3502,28 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
         steps: [
           TutorStepData(
             title: 'Understand LCM',
-            body: 'We want the smallest positive number that both $a and $b divide exactly.',
-            why: 'A common multiple is a shared landing point in the multiples of both numbers.',
+            body:
+                'We want the smallest positive number that both $a and $b divide exactly.',
+            why:
+                'A common multiple is a shared landing point in the multiples of both numbers.',
           ),
           TutorStepData(
             title: 'Find the common multiple efficiently',
-            body: 'Use LCM(a,b) = (a × b) ÷ GCF(a,b).\nGCF($a,$b) = $g.\nSo LCM = ($a × $b) ÷ $g = $lcm.',
-            why: 'Dividing by the GCF removes the shared factor that would otherwise be counted twice.',
+            body:
+                'Use LCM(a,b) = (a Ã— b) Ã· GCF(a,b).\nGCF($a,$b) = $g.\nSo LCM = ($a Ã— $b) Ã· $g = $lcm.',
+            why:
+                'Dividing by the GCF removes the shared factor that would otherwise be counted twice.',
           ),
           TutorStepData(
             title: 'Check the answer',
-            body: '$a × ${lcm ~/ a} = $lcm and $b × ${lcm ~/ b} = $lcm.',
-            why: 'Both original numbers must divide the LCM exactly, and no smaller positive common multiple should exist.',
+            body: '$a Ã— ${lcm ~/ a} = $lcm and $b Ã— ${lcm ~/ b} = $lcm.',
+            why:
+                'Both original numbers must divide the LCM exactly, and no smaller positive common multiple should exist.',
           ),
         ],
         answer: lcm.toString(),
-        methodSummary: 'Find the GCF, use LCM = (a × b) ÷ GCF, then verify both numbers divide the result.',
+        methodSummary:
+            'Find the GCF, use LCM = (a Ã— b) Ã· GCF, then verify both numbers divide the result.',
         example: 'LCM of 6 and 8 = 24',
         supported: true,
       );
@@ -3100,10 +3540,18 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
     final bRaw = twoSideEq.group(3)!;
     final cRaw = twoSideEq.group(4)!;
     final dRaw = twoSideEq.group(6)!;
-    final a = aRaw.isEmpty || aRaw == '+' ? 1.0 : aRaw == '-' ? -1.0 : double.parse(aRaw);
+    final a = aRaw.isEmpty || aRaw == '+'
+        ? 1.0
+        : aRaw == '-'
+            ? -1.0
+            : double.parse(aRaw);
     final bValue = double.parse(bRaw);
     final b = twoSideEq.group(2)! == '+' ? bValue : -bValue;
-    final c = cRaw.isEmpty || cRaw == '+' ? 1.0 : cRaw == '-' ? -1.0 : double.parse(cRaw);
+    final c = cRaw.isEmpty || cRaw == '+'
+        ? 1.0
+        : cRaw == '-'
+            ? -1.0
+            : double.parse(cRaw);
     final dValue = double.parse(dRaw);
     final dSign = twoSideEq.group(5)!;
     final d = dSign == '+' ? dValue : -dValue;
@@ -3118,33 +3566,44 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
         steps: [
           TutorStepData(
             title: 'Understand the balance',
-            body: '$a x${b >= 0 ? ' + ' : ' - '}${_formatNumber(b.abs())} = $c x${d >= 0 ? ' + ' : ' - '}${_formatNumber(d.abs())}',
-            why: 'Both sides of an equation have the same value, so every operation must preserve that equality.',
+            body:
+                '$a x${b >= 0 ? ' + ' : ' - '}${_formatNumber(b.abs())} = $c x${d >= 0 ? ' + ' : ' - '}${_formatNumber(d.abs())}',
+            why:
+                'Both sides of an equation have the same value, so every operation must preserve that equality.',
           ),
           TutorStepData(
             title: 'Collect the x terms',
-            body: 'Subtract ${_formatNumber(c)}x from both sides:\n${_formatNumber(combined)}x${b >= 0 ? ' + ' : ' - '}${_formatNumber(b.abs())} = ${_formatNumber(d)}.',
-            why: 'Putting all x terms on one side makes the unknown easier to isolate.',
+            body:
+                'Subtract ${_formatNumber(c)}x from both sides:\n${_formatNumber(combined)}x${b >= 0 ? ' + ' : ' - '}${_formatNumber(b.abs())} = ${_formatNumber(d)}.',
+            why:
+                'Putting all x terms on one side makes the unknown easier to isolate.',
           ),
           TutorStepData(
             title: 'Move the constant terms',
-            body: 'Subtract ${_formatNumber(b)} from both sides:\n${_formatNumber(combined)}x = ${_formatNumber(target)}.',
-            why: 'Removing the constant leaves only the x term and its coefficient.',
+            body:
+                'Subtract ${_formatNumber(b)} from both sides:\n${_formatNumber(combined)}x = ${_formatNumber(target)}.',
+            why:
+                'Removing the constant leaves only the x term and its coefficient.',
           ),
           TutorStepData(
             title: 'Divide by the coefficient',
-            body: 'x = ${_formatNumber(target)} ÷ ${_formatNumber(combined)} = $xText.',
-            why: 'Division undoes multiplication by the coefficient, leaving x by itself.',
+            body:
+                'x = ${_formatNumber(target)} Ã· ${_formatNumber(combined)} = $xText.',
+            why:
+                'Division undoes multiplication by the coefficient, leaving x by itself.',
           ),
           TutorStepData(
             title: 'Check by substitution',
-            body: 'Substitute x = $xText into both original sides and confirm they are equal.',
-            why: 'Substitution verifies that the solution works in the original equation, not just the transformed equation.',
+            body:
+                'Substitute x = $xText into both original sides and confirm they are equal.',
+            why:
+                'Substitution verifies that the solution works in the original equation, not just the transformed equation.',
           ),
         ],
         answer: 'x = $xText',
-        methodSummary: 'Collect x terms, collect constants, isolate x, then verify by substitution.',
-        example: '2x + 5 = x + 12 → x = 7',
+        methodSummary:
+            'Collect x terms, collect constants, isolate x, then verify by substitution.',
+        example: '2x + 5 = x + 12 â†’ x = 7',
         supported: true,
       );
     }
@@ -3152,7 +3611,7 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
 
   // Geometry: rectangle, square, triangle and circle.
   final rect = RegExp(
-    r'^\s*(?:area\s+of\s+)?(?:a\s+)?rectangle\s+(?:with\s+)?(?:length\s+)?(-?(?:\d+(?:\.\d+)?|\.\d+))\s*(?:and|by|x|×)\s*(-?(?:\d+(?:\.\d+)?|\.\d+))\s*$',
+    r'^\s*(?:area\s+of\s+)?(?:a\s+)?rectangle\s+(?:with\s+)?(?:length\s+)?(-?(?:\d+(?:\.\d+)?|\.\d+))\s*(?:and|by|x|Ã—)\s*(-?(?:\d+(?:\.\d+)?|\.\d+))\s*$',
     caseSensitive: false,
   ).firstMatch(lower);
   if (rect != null) {
@@ -3171,23 +3630,29 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
         ),
         TutorStepData(
           title: 'Use the area formula',
-          body: 'Area = length × width\n= ${_formatNumber(l)} × ${_formatNumber(w)}\n= ${_formatNumber(area)} square units.',
-          why: 'A rectangle can be divided into rows of equal unit squares, so multiplying length by width counts the total squares.',
+          body:
+              'Area = length Ã— width\n= ${_formatNumber(l)} Ã— ${_formatNumber(w)}\n= ${_formatNumber(area)} square units.',
+          why:
+              'A rectangle can be divided into rows of equal unit squares, so multiplying length by width counts the total squares.',
         ),
         TutorStepData(
           title: 'Know the related perimeter',
-          body: 'Perimeter = 2(length + width) = ${_formatNumber(perimeter)} units.',
-          why: 'Perimeter measures the distance around the rectangle, so both pairs of equal sides are included.',
+          body:
+              'Perimeter = 2(length + width) = ${_formatNumber(perimeter)} units.',
+          why:
+              'Perimeter measures the distance around the rectangle, so both pairs of equal sides are included.',
         ),
         TutorStepData(
           title: 'Check the units',
           body: 'Area uses square units; perimeter uses ordinary units.',
-          why: 'Units tell you whether you calculated a surface region or a boundary distance.',
+          why:
+              'Units tell you whether you calculated a surface region or a boundary distance.',
         ),
       ],
       answer: _formatNumber(area),
-      methodSummary: 'Multiply length by width for area, and use 2(length + width) for perimeter.',
-      example: 'Rectangle 8 by 5 → area 40 square units',
+      methodSummary:
+          'Multiply length by width for area, and use 2(length + width) for perimeter.',
+      example: 'Rectangle 8 by 5 â†’ area 40 square units',
       supported: true,
     );
   }
@@ -3207,22 +3672,27 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
         TutorStepData(
           title: 'Identify the radius',
           body: 'Radius = ${_formatNumber(r)}.',
-          why: 'The radius is the distance from the centre of the circle to its edge.',
+          why:
+              'The radius is the distance from the centre of the circle to its edge.',
         ),
         TutorStepData(
           title: 'Use the area formula',
-          body: 'Area = πr² = π × ${_formatNumber(r)} × ${_formatNumber(r)} ≈ ${_formatNumber(area)} square units.',
-          why: 'The area formula πr² measures the surface enclosed by the circle.',
+          body:
+              'Area = Ï€rÂ² = Ï€ Ã— ${_formatNumber(r)} Ã— ${_formatNumber(r)} â‰ˆ ${_formatNumber(area)} square units.',
+          why:
+              'The area formula Ï€rÂ² measures the surface enclosed by the circle.',
         ),
         TutorStepData(
           title: 'Related circumference check',
-          body: 'Circumference = 2πr ≈ ${_formatNumber(circumference)} units.',
-          why: 'This provides a related measurement around the boundary and helps keep the radius meaning clear.',
+          body: 'Circumference = 2Ï€r â‰ˆ ${_formatNumber(circumference)} units.',
+          why:
+              'This provides a related measurement around the boundary and helps keep the radius meaning clear.',
         ),
       ],
       answer: _formatNumber(area),
-      methodSummary: 'Square the radius, multiply by π, then check the units. For circumference use 2πr.',
-      example: 'Circle radius 7 → area ≈ 153.94 square units',
+      methodSummary:
+          'Square the radius, multiply by Ï€, then check the units. For circumference use 2Ï€r.',
+      example: 'Circle radius 7 â†’ area â‰ˆ 153.94 square units',
       supported: true,
     );
   }
@@ -3236,13 +3706,19 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
     final amount = double.parse(conversion.group(1)!);
     final from = conversion.group(2)!.toLowerCase();
     final to = conversion.group(3)!.toLowerCase();
-    final lengthFactors = <String, double>{'mm': 0.001, 'cm': 0.01, 'm': 1, 'km': 1000};
+    final lengthFactors = <String, double>{
+      'mm': 0.001,
+      'cm': 0.01,
+      'm': 1,
+      'km': 1000
+    };
     final massFactors = <String, double>{'g': 1, 'kg': 1000};
-    final factors = lengthFactors.containsKey(from) && lengthFactors.containsKey(to)
-        ? lengthFactors
-        : massFactors.containsKey(from) && massFactors.containsKey(to)
-            ? massFactors
-            : null;
+    final factors =
+        lengthFactors.containsKey(from) && lengthFactors.containsKey(to)
+            ? lengthFactors
+            : massFactors.containsKey(from) && massFactors.containsKey(to)
+                ? massFactors
+                : null;
     if (factors != null) {
       final base = amount * factors[from]!;
       final result = base / factors[to]!;
@@ -3252,27 +3728,34 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
         steps: [
           TutorStepData(
             title: 'Identify the units',
-            body: '${_formatNumber(amount)} $from → $to',
-            why: 'A conversion changes the unit label while keeping the physical quantity the same.',
+            body: '${_formatNumber(amount)} $from â†’ $to',
+            why:
+                'A conversion changes the unit label while keeping the physical quantity the same.',
           ),
           TutorStepData(
             title: 'Convert through a common base unit',
-            body: '${_formatNumber(amount)} $from = ${_formatNumber(base)} ${factors == lengthFactors ? 'metres' : 'grams'}.',
-            why: 'Using one common unit prevents mixing incompatible conversion steps.',
+            body:
+                '${_formatNumber(amount)} $from = ${_formatNumber(base)} ${factors == lengthFactors ? 'metres' : 'grams'}.',
+            why:
+                'Using one common unit prevents mixing incompatible conversion steps.',
           ),
           TutorStepData(
             title: 'Convert to the requested unit',
-            body: '${_formatNumber(base)} base units = ${_formatNumber(result)} $to.',
-            why: 'The final conversion applies the scale between the base unit and the requested unit.',
+            body:
+                '${_formatNumber(base)} base units = ${_formatNumber(result)} $to.',
+            why:
+                'The final conversion applies the scale between the base unit and the requested unit.',
           ),
           TutorStepData(
             title: 'Check the direction',
-            body: 'Moving to a smaller unit makes the number larger; moving to a larger unit makes the number smaller.',
+            body:
+                'Moving to a smaller unit makes the number larger; moving to a larger unit makes the number smaller.',
             why: 'This size check catches reversed conversion factors.',
           ),
         ],
         answer: '${_formatNumber(result)} $to',
-        methodSummary: 'Convert to a common base unit, then convert from the base unit to the requested unit.',
+        methodSummary:
+            'Convert to a common base unit, then convert from the base unit to the requested unit.',
         example: '2.5 m to cm = 250 cm',
         supported: true,
       );
@@ -3283,7 +3766,6 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
 }
 
 String rootTextFor(double value) => _formatNumber(value);
-
 
 TutorSolution solveTutorQuestion(String question) {
   final cleaned = question.trim();
@@ -3315,12 +3797,15 @@ TutorSolution solveTutorQuestion(String question) {
         TutorStepData(
           title: 'Understand the change',
           body: 'Start with $baseText and change it by $pText%.',
-          why: 'A percentage change describes how much the original amount is changed relative to the original amount.',
+          why:
+              'A percentage change describes how much the original amount is changed relative to the original amount.',
         ),
         TutorStepData(
           title: 'Find the percentage amount',
-          body: '$pText% of $baseText = $pText ÷ 100 × $baseText = ${_formatNumber(delta)}.',
-          why: 'We first calculate the size of the change itself. This is the amount that will be added or removed.',
+          body:
+              '$pText% of $baseText = $pText Ã· 100 Ã— $baseText = ${_formatNumber(delta)}.',
+          why:
+              'We first calculate the size of the change itself. This is the amount that will be added or removed.',
         ),
         TutorStepData(
           title: increase ? 'Add the increase' : 'Subtract the decrease',
@@ -3336,12 +3821,15 @@ TutorSolution solveTutorQuestion(String question) {
           body: increase
               ? 'The answer $answerText is greater than $baseText, which matches an increase.'
               : 'The answer $answerText is less than $baseText, which matches a decrease.',
-          why: 'Checking the direction catches the common mistake of adding when the question asked for a decrease, or subtracting when it asked for an increase.',
+          why:
+              'Checking the direction catches the common mistake of adding when the question asked for a decrease, or subtracting when it asked for an increase.',
         ),
       ],
       answer: answerText,
-      methodSummary: 'Find the percentage amount first, then add it for an increase or subtract it for a decrease, and finally check the direction.',
-      example: increase ? '80 increased by 25% = 100' : '80 decreased by 25% = 60',
+      methodSummary:
+          'Find the percentage amount first, then add it for an increase or subtract it for a decrease, and finally check the direction.',
+      example:
+          increase ? '80 increased by 25% = 100' : '80 decreased by 25% = 60',
       supported: true,
     );
   }
@@ -3366,27 +3854,32 @@ TutorSolution solveTutorQuestion(String question) {
           TutorStepData(
             title: 'Identify the part and whole',
             body: '$partText is the part and $wholeText is the whole.',
-            why: 'Percentage asks how large the part is compared with the whole, with the comparison expressed out of 100.',
+            why:
+                'Percentage asks how large the part is compared with the whole, with the comparison expressed out of 100.',
           ),
           TutorStepData(
             title: 'Write the fraction',
-            body: '$partText ÷ $wholeText = ${_formatNumber(part / whole)}.',
-            why: 'Dividing part by whole tells us what fraction of the whole the part represents.',
+            body: '$partText Ã· $wholeText = ${_formatNumber(part / whole)}.',
+            why:
+                'Dividing part by whole tells us what fraction of the whole the part represents.',
           ),
           TutorStepData(
             title: 'Convert the fraction to a percentage',
-            body: '${_formatNumber(part / whole)} × 100 = $answerText%.',
-            why: 'Multiplying by 100 changes the fraction into the equivalent number of parts out of 100.',
+            body: '${_formatNumber(part / whole)} Ã— 100 = $answerText%.',
+            why:
+                'Multiplying by 100 changes the fraction into the equivalent number of parts out of 100.',
           ),
           TutorStepData(
             title: 'Check the answer',
             body: '$answerText% of $wholeText equals $partText.',
-            why: 'Reversing the calculation is a direct check that the percentage is consistent with the original numbers.',
+            why:
+                'Reversing the calculation is a direct check that the percentage is consistent with the original numbers.',
           ),
         ],
         answer: '$answerText%',
-        methodSummary: 'Divide the part by the whole, then multiply by 100 to express the relationship as a percentage.',
-        example: '20 is what percent of 80? → 25%',
+        methodSummary:
+            'Divide the part by the whole, then multiply by 100 to express the relationship as a percentage.',
+        example: '20 is what percent of 80? â†’ 25%',
         supported: true,
       );
     }
@@ -3398,7 +3891,8 @@ TutorSolution solveTutorQuestion(String question) {
     caseSensitive: false,
   ).firstMatch(cleaned.replaceAll('?', '').trim());
   if (average != null) {
-    final values = average.group(1)!
+    final values = average
+        .group(1)!
         .split(RegExp(r'\s*,\s*|\s+and\s+'))
         .map((v) => double.tryParse(v.trim()))
         .toList();
@@ -3414,26 +3908,31 @@ TutorSolution solveTutorQuestion(String question) {
           TutorStepData(
             title: 'Identify the numbers',
             body: nums.map(_formatNumber).join(', '),
-            why: 'The mean combines all the values into one total and then shares that total equally across the number of values.',
+            why:
+                'The mean combines all the values into one total and then shares that total equally across the number of values.',
           ),
           TutorStepData(
             title: 'Add all the values',
-            body: nums.map(_formatNumber).join(' + ') + ' = ${_formatNumber(sum)}.',
-            why: 'The first step in finding a mean is to find the complete total represented by all the values.',
+            body: nums.map(_formatNumber).join(' + ') +
+                ' = ${_formatNumber(sum)}.',
+            why:
+                'The first step in finding a mean is to find the complete total represented by all the values.',
           ),
           TutorStepData(
             title: 'Count the values',
             body: 'There are ${nums.length} values.',
-            why: 'The total must be shared equally among every value in the data set, so we divide by the count.',
+            why:
+                'The total must be shared equally among every value in the data set, so we divide by the count.',
           ),
           TutorStepData(
             title: 'Divide the total by the count',
-            body: '${_formatNumber(sum)} ÷ ${nums.length} = $resultText.',
-            why: 'Dividing the total equally gives the value that represents the center of the data set.',
+            body: '${_formatNumber(sum)} Ã· ${nums.length} = $resultText.',
+            why:
+                'Dividing the total equally gives the value that represents the center of the data set.',
           ),
         ],
         answer: resultText,
-        methodSummary: 'Mean = total of all values ÷ number of values.',
+        methodSummary: 'Mean = total of all values Ã· number of values.',
         example: 'Average of 10, 20, 30 = 20',
         supported: true,
       );
@@ -3471,23 +3970,27 @@ TutorSolution solveTutorQuestion(String question) {
           ),
           TutorStepData(
             title: 'Use cross multiplication',
-            body: '$a × $dToken = $b × $cToken.\nThen isolate x by dividing by the remaining known factor.\n\nx = $xText.',
-            why: 'Cross multiplication creates two equal products. This lets us turn the ratio relationship into a simple equation that can be solved.',
+            body:
+                '$a Ã— $dToken = $b Ã— $cToken.\nThen isolate x by dividing by the remaining known factor.\n\nx = $xText.',
+            why:
+                'Cross multiplication creates two equal products. This lets us turn the ratio relationship into a simple equation that can be solved.',
           ),
           TutorStepData(
             title: 'Check the proportion',
-            body: 'Substitute x = $xText back into the ratio and compare the two sides.',
-            why: 'A proportion is correct only when both ratios represent the same multiplier.',
+            body:
+                'Substitute x = $xText back into the ratio and compare the two sides.',
+            why:
+                'A proportion is correct only when both ratios represent the same multiplier.',
           ),
         ],
         answer: 'x = $xText',
-        methodSummary: 'Use cross multiplication to turn the proportion into an equation, isolate x, and verify the ratio.',
-        example: '2:3 = x:12 → x = 8',
+        methodSummary:
+            'Use cross multiplication to turn the proportion into an equation, isolate x, and verify the ratio.',
+        example: '2:3 = x:12 â†’ x = 8',
         supported: true,
       );
     }
   }
-
 
   // Percentages: 25% of 80, what is 15% of 200, etc.
   final percent = RegExp(
@@ -3508,33 +4011,41 @@ TutorSolution solveTutorQuestion(String question) {
         TutorStepData(
           title: 'Understand the question',
           body: 'We need to find $pText% of $baseText.',
-          why: 'The word “of” means we are taking that percentage of the whole amount.',
+          why:
+              'The word â€œofâ€ means we are taking that percentage of the whole amount.',
         ),
         TutorStepData(
           title: 'Convert the percent to a decimal',
-          body: '$pText% = $pText ÷ 100 = ${_formatNumber(p / 100)}.',
-          why: 'A percent means “out of 100”, so dividing by 100 changes the percentage into a decimal multiplier.',
+          body: '$pText% = $pText Ã· 100 = ${_formatNumber(p / 100)}.',
+          why:
+              'A percent means â€œout of 100â€, so dividing by 100 changes the percentage into a decimal multiplier.',
         ),
         TutorStepData(
           title: 'Multiply by the whole amount',
-          body: '${_formatNumber(p / 100)} × $baseText = $answerText.',
-          why: 'Multiplying the whole amount by the decimal percentage finds exactly that fraction of the whole.',
+          body: '${_formatNumber(p / 100)} Ã— $baseText = $answerText.',
+          why:
+              'Multiplying the whole amount by the decimal percentage finds exactly that fraction of the whole.',
         ),
         TutorStepData(
           title: 'Check the size',
-          body: '$pText% of $baseText is $answerText. Because $pText% is less than 100%, the answer should be less than $baseText.',
-          why: 'A quick size check helps catch a misplaced decimal or an incorrect percentage conversion.',
+          body:
+              '$pText% of $baseText is $answerText. Because $pText% is less than 100%, the answer should be less than $baseText.',
+          why:
+              'A quick size check helps catch a misplaced decimal or an incorrect percentage conversion.',
         ),
       ],
       answer: answerText,
-      methodSummary: 'To find a percentage of a number: convert the percent to a decimal, multiply by the whole amount, then check whether the size makes sense.',
+      methodSummary:
+          'To find a percentage of a number: convert the percent to a decimal, multiply by the whole amount, then check whether the size makes sense.',
       example: '20% of 150 = 30',
       supported: true,
     );
   }
 
   // Fractions such as 1/2 + 1/4.
-  final fractionExpr = RegExp(r'^\s*(-?\d+\s*/\s*\d+)\s*([+\-*/])\s*(-?\d+\s*/\s*\d+)\s*$').firstMatch(expression);
+  final fractionExpr =
+      RegExp(r'^\s*(-?\d+\s*/\s*\d+)\s*([+\-*/])\s*(-?\d+\s*/\s*\d+)\s*$')
+          .firstMatch(expression);
   if (fractionExpr != null) {
     final a = _parseFraction(fractionExpr.group(1)!);
     final b = _parseFraction(fractionExpr.group(3)!);
@@ -3559,15 +4070,19 @@ TutorSolution solveTutorQuestion(String question) {
       if (op == '+') {
         final leftNumerator = a.numerator * b.denominator;
         final rightNumerator = b.numerator * a.denominator;
-        working = '${a.display} + ${b.display}\n= $leftNumerator/$commonDenominator + $rightNumerator/$commonDenominator\n= ${(leftNumerator + rightNumerator)}/$commonDenominator\n= ${result.display}';
+        working =
+            '${a.display} + ${b.display}\n= $leftNumerator/$commonDenominator + $rightNumerator/$commonDenominator\n= ${(leftNumerator + rightNumerator)}/$commonDenominator\n= ${result.display}';
       } else if (op == '-') {
         final leftNumerator = a.numerator * b.denominator;
         final rightNumerator = b.numerator * a.denominator;
-        working = '${a.display} - ${b.display}\n= $leftNumerator/$commonDenominator - $rightNumerator/$commonDenominator\n= ${(leftNumerator - rightNumerator)}/$commonDenominator\n= ${result.display}';
+        working =
+            '${a.display} - ${b.display}\n= $leftNumerator/$commonDenominator - $rightNumerator/$commonDenominator\n= ${(leftNumerator - rightNumerator)}/$commonDenominator\n= ${result.display}';
       } else if (op == '*') {
-        working = '${a.display} × ${b.display}\n= ${a.numerator} × ${b.numerator} / (${a.denominator} × ${b.denominator})\n= ${result.display}';
+        working =
+            '${a.display} Ã— ${b.display}\n= ${a.numerator} Ã— ${b.numerator} / (${a.denominator} Ã— ${b.denominator})\n= ${result.display}';
       } else {
-        working = '${a.display} ÷ ${b.display}\n= ${a.numerator}/${a.denominator} × ${b.denominator}/${b.numerator}\n= ${result.display}';
+        working =
+            '${a.display} Ã· ${b.display}\n= ${a.numerator}/${a.denominator} Ã— ${b.denominator}/${b.numerator}\n= ${result.display}';
       }
       return TutorSolution(
         question: cleaned,
@@ -3576,10 +4091,13 @@ TutorSolution solveTutorQuestion(String question) {
           TutorStepData(
             title: 'Understand the fraction problem',
             body: 'We are using ${a.display} and ${b.display} with $op.',
-            why: 'Fractions represent parts of a whole. The operation tells us how those parts must be combined or compared.',
+            why:
+                'Fractions represent parts of a whole. The operation tells us how those parts must be combined or compared.',
           ),
           TutorStepData(
-            title: op == '*' || op == '/' ? 'Use the fraction rule' : 'Make the denominators compatible',
+            title: op == '*' || op == '/'
+                ? 'Use the fraction rule'
+                : 'Make the denominators compatible',
             body: op == '*' || op == '/'
                 ? working
                 : 'For $opName, both fractions need the same denominator before we combine them. A common denominator is $commonDenominator.\n\n$working',
@@ -3589,20 +4107,30 @@ TutorSolution solveTutorQuestion(String question) {
           ),
           TutorStepData(
             title: 'Simplify the result',
-            body: '${result.numerator}/${result.denominator} simplifies to ${result.display}.',
-            why: 'A fraction should be reduced when the numerator and denominator share a common factor so the answer is in simplest form.',
+            body:
+                '${result.numerator}/${result.denominator} simplifies to ${result.display}.',
+            why:
+                'A fraction should be reduced when the numerator and denominator share a common factor so the answer is in simplest form.',
           ),
           TutorStepData(
             title: 'Check the answer',
-            body: 'The final answer is ${result.display}. As a decimal it is ${_formatNumber(result.value)}.',
-            why: 'The decimal form gives another way to check that the size of the answer is reasonable.',
+            body:
+                'The final answer is ${result.display}. As a decimal it is ${_formatNumber(result.value)}.',
+            why:
+                'The decimal form gives another way to check that the size of the answer is reasonable.',
           ),
         ],
         answer: result.display,
         methodSummary: op == '*' || op == '/'
             ? 'For fraction multiplication or division, use the operation rule, then reduce the answer to simplest form.'
             : 'For fraction addition or subtraction, use a common denominator, combine the numerators, then simplify.',
-        example: op == '+' ? '1/2 + 1/4 = 3/4' : op == '-' ? '3/4 - 1/4 = 1/2' : op == '*' ? '2/3 × 3/4 = 1/2' : '1/2 ÷ 1/4 = 2',
+        example: op == '+'
+            ? '1/2 + 1/4 = 3/4'
+            : op == '-'
+                ? '3/4 - 1/4 = 1/2'
+                : op == '*'
+                    ? '2/3 Ã— 3/4 = 1/2'
+                    : '1/2 Ã· 1/4 = 2',
         supported: true,
       );
     }
@@ -3615,7 +4143,11 @@ TutorSolution solveTutorQuestion(String question) {
   ).firstMatch(expression.replaceAll(' ', ''));
   if (equation != null) {
     final coefficientRaw = equation.group(1)!;
-    final a = coefficientRaw.isEmpty || coefficientRaw == '+' ? 1.0 : coefficientRaw == '-' ? -1.0 : double.parse(coefficientRaw);
+    final a = coefficientRaw.isEmpty || coefficientRaw == '+'
+        ? 1.0
+        : coefficientRaw == '-'
+            ? -1.0
+            : double.parse(coefficientRaw);
     final sign = equation.group(2)!;
     final bValue = double.parse(equation.group(3)!);
     final c = double.parse(equation.group(4)!);
@@ -3624,77 +4156,102 @@ TutorSolution solveTutorQuestion(String question) {
       final isolateValue = c - b;
       final x = isolateValue / a;
       final xText = _formatNumber(x);
-      final equationText = '$coefficientRaw' + 'x $sign $bValue = ${_formatNumber(c)}';
+      final equationText =
+          '$coefficientRaw' + 'x $sign $bValue = ${_formatNumber(c)}';
       return TutorSolution(
         question: cleaned,
         topic: 'Algebra',
         steps: [
           TutorStepData(
             title: 'Understand the equation',
-            body: 'We want to find the value of x that makes $equationText true.',
-            why: 'An equation is a balance. Whatever we do to one side must preserve that balance on the other side.',
+            body:
+                'We want to find the value of x that makes $equationText true.',
+            why:
+                'An equation is a balance. Whatever we do to one side must preserve that balance on the other side.',
           ),
           TutorStepData(
             title: 'Move the constant term',
-            body: '$equationText\n\nSubtract ${_formatNumber(b)} from both sides when the constant is positive, or add ${_formatNumber(b.abs())} when it is negative.\n\n$a x = ${_formatNumber(isolateValue)}.',
-            why: 'We remove the number that is not attached to x so that x is isolated on its own.',
+            body:
+                '$equationText\n\nSubtract ${_formatNumber(b)} from both sides when the constant is positive, or add ${_formatNumber(b.abs())} when it is negative.\n\n$a x = ${_formatNumber(isolateValue)}.',
+            why:
+                'We remove the number that is not attached to x so that x is isolated on its own.',
           ),
           TutorStepData(
             title: 'Divide by the coefficient of x',
-            body: 'Divide both sides by ${_formatNumber(a)}:\n\nx = ${_formatNumber(isolateValue)} ÷ ${_formatNumber(a)}\n\nx = $xText',
-            why: 'Multiplication by a is undone by division by a. This leaves x by itself without changing the balance.',
+            body:
+                'Divide both sides by ${_formatNumber(a)}:\n\nx = ${_formatNumber(isolateValue)} Ã· ${_formatNumber(a)}\n\nx = $xText',
+            why:
+                'Multiplication by a is undone by division by a. This leaves x by itself without changing the balance.',
           ),
           TutorStepData(
             title: 'Check by substitution',
-            body: 'Put x = $xText back into the original equation.\n\n${_formatNumber(a)}($xText) ${b >= 0 ? '+' : '-'} ${_formatNumber(b.abs())} = ${_formatNumber(c)}.\n\nThe two sides match, so x = $xText is correct.',
-            why: 'Substitution is the strongest quick check because it tests the value in the original equation.',
+            body:
+                'Put x = $xText back into the original equation.\n\n${_formatNumber(a)}($xText) ${b >= 0 ? '+' : '-'} ${_formatNumber(b.abs())} = ${_formatNumber(c)}.\n\nThe two sides match, so x = $xText is correct.',
+            why:
+                'Substitution is the strongest quick check because it tests the value in the original equation.',
           ),
         ],
         answer: 'x = $xText',
-        methodSummary: 'For a simple linear equation, isolate the term containing x, then undo its coefficient by dividing, and finally check the value by substitution.',
-        example: '2x + 5 = 15 → x = 5',
+        methodSummary:
+            'For a simple linear equation, isolate the term containing x, then undo its coefficient by dividing, and finally check the value by substitution.',
+        example: '2x + 5 = 15 â†’ x = 5',
         supported: true,
       );
     }
   }
 
-
   // Multi-step arithmetic using order of operations, including parentheses.
-  final hasMultipleOperators = RegExp(r'[+\-*/]').allMatches(expression).length >= 2;
-  if (hasMultipleOperators && !expression.contains('x') && !expression.contains(':')) {
+  final hasMultipleOperators =
+      RegExp(r'[+\-*/]').allMatches(expression).length >= 2;
+  if (hasMultipleOperators &&
+      !expression.contains('x') &&
+      !expression.contains(':')) {
     final advanced = _evaluateAdvancedExpression(expression);
     if (advanced != null) {
       final working = advanced.steps.isEmpty
           ? 'Evaluate the expression carefully using the order of operations.'
-          : advanced.steps.asMap().entries.map((entry) => 'Step ${entry.key + 1}: ${entry.value}').join('\n');
+          : advanced.steps
+              .asMap()
+              .entries
+              .map((entry) => 'Step ${entry.key + 1}: ${entry.value}')
+              .join('\n');
       return TutorSolution(
         question: cleaned,
         topic: 'Order of Operations',
         steps: [
           TutorStepData(
             title: 'Understand the expression',
-            body: 'This question contains more than one operation, so we must follow the order of operations rather than simply calculating from left to right.',
-            why: 'Different operations have different priorities. Following a common order makes sure everyone gets the same correct result.',
+            body:
+                'This question contains more than one operation, so we must follow the order of operations rather than simply calculating from left to right.',
+            why:
+                'Different operations have different priorities. Following a common order makes sure everyone gets the same correct result.',
           ),
           TutorStepData(
             title: 'Work through the priority rules',
-            body: 'First solve parentheses, then multiplication/division, then addition/subtraction, working left to right within the same priority.\n\n$working',
-            why: 'Multiplication and division are grouped before addition and subtraction so the expression keeps its intended mathematical structure.',
+            body:
+                'First solve parentheses, then multiplication/division, then addition/subtraction, working left to right within the same priority.\n\n$working',
+            why:
+                'Multiplication and division are grouped before addition and subtraction so the expression keeps its intended mathematical structure.',
           ),
           TutorStepData(
             title: 'Read the final result',
-            body: 'After all of the smaller operations are completed, the expression equals ${_formatNumber(advanced.value)}.',
-            why: 'The final value is reached by carrying the result of each completed operation into the next stage.',
+            body:
+                'After all of the smaller operations are completed, the expression equals ${_formatNumber(advanced.value)}.',
+            why:
+                'The final value is reached by carrying the result of each completed operation into the next stage.',
           ),
           TutorStepData(
             title: 'Check the calculation',
-            body: 'Repeat the operations in the same order and confirm that you reach ${_formatNumber(advanced.value)} again.',
-            why: 'Repeating the same order is a simple way to catch an operation that was performed too early or too late.',
+            body:
+                'Repeat the operations in the same order and confirm that you reach ${_formatNumber(advanced.value)} again.',
+            why:
+                'Repeating the same order is a simple way to catch an operation that was performed too early or too late.',
           ),
         ],
         answer: _formatNumber(advanced.value),
-        methodSummary: 'Use parentheses first, then multiplication/division, then addition/subtraction, and work left to right within each level.',
-        example: '2 + 3 × 4 = 14',
+        methodSummary:
+            'Use parentheses first, then multiplication/division, then addition/subtraction, and work left to right within each level.',
+        example: '2 + 3 Ã— 4 = 14',
         supported: true,
       );
     }
@@ -3711,17 +4268,21 @@ TutorSolution solveTutorQuestion(String question) {
       steps: const [
         TutorStepData(
           title: 'Read the question carefully',
-          body: 'TutorAI needs a clearer expression or a supported question type before it can teach the solution accurately.',
-          why: 'A tutor should not invent a method when the question is unclear. Getting the exact wording right prevents teaching the wrong concept.',
+          body:
+              'TutorAI needs a clearer expression or a supported question type before it can teach the solution accurately.',
+          why:
+              'A tutor should not invent a method when the question is unclear. Getting the exact wording right prevents teaching the wrong concept.',
         ),
         TutorStepData(
           title: 'Try a supported format',
           body: 'Examples:\n\n12.5 + 3.75\n1/2 + 1/4\n25% of 80\n2x + 5 = 15',
-          why: 'These examples give TutorAI enough mathematical structure to show every step and explain why each step works.',
+          why:
+              'These examples give TutorAI enough mathematical structure to show every step and explain why each step works.',
         ),
       ],
       answer: 'Need a clearer question',
-      methodSummary: 'TutorAI will only give a solution when it can identify the mathematical structure reliably.',
+      methodSummary:
+          'TutorAI will only give a solution when it can identify the mathematical structure reliably.',
       example: 'Try: 25% of 80',
       supported: false,
     );
@@ -3743,13 +4304,15 @@ TutorSolution solveTutorQuestion(String question) {
       steps: const [
         TutorStepData(
           title: 'Check the divisor first',
-          body: 'The divisor is 0. Division by zero is undefined, so there is no ordinary numerical answer.',
-          why: 'There is no number that you can multiply by 0 to get a nonzero dividend. Dividing by zero would break the meaning of division.',
+          body:
+              'The divisor is 0. Division by zero is undefined, so there is no ordinary numerical answer.',
+          why:
+              'There is no number that you can multiply by 0 to get a nonzero dividend. Dividing by zero would break the meaning of division.',
         ),
       ],
       answer: 'Undefined',
       methodSummary: 'Before dividing, check that the divisor is not zero.',
-      example: '8 ÷ 2 = 4',
+      example: '8 Ã· 2 = 4',
       supported: true,
     );
   }
@@ -3767,7 +4330,7 @@ TutorSolution solveTutorQuestion(String question) {
     final places = _max(leftPlaces, rightPlaces);
     final l = _padDecimal(leftText, places);
     final r = _padDecimal(rightText, places);
-    final aligned = '  $l\n+ $r\n──────\n$resultText';
+    final aligned = '  $l\n+ $r\nâ”€â”€â”€â”€â”€â”€\n$resultText';
     return TutorSolution(
       question: cleaned,
       topic: isDecimal ? 'Decimal Addition' : 'Addition',
@@ -3775,26 +4338,34 @@ TutorSolution solveTutorQuestion(String question) {
         TutorStepData(
           title: 'Understand the question',
           body: 'We are combining $leftText and $rightText to find the total.',
-          why: 'Addition combines quantities. The answer tells us how much there is altogether.',
+          why:
+              'Addition combines quantities. The answer tells us how much there is altogether.',
         ),
         TutorStepData(
-          title: isDecimal ? 'Make the place values visible' : 'Line up the place values',
+          title: isDecimal
+              ? 'Make the place values visible'
+              : 'Line up the place values',
           body: isDecimal
               ? 'Write equal place values in the same columns. If needed, add trailing zeros without changing the value.\n\n$aligned'
               : 'Place ones under ones, tens under tens, and so on:\n\n$leftText\n+ $rightText',
           why: isDecimal
-              ? 'A trailing zero does not change a decimal’s value. It simply makes the tenths and hundredths columns visible so equal-sized units can be added together.'
+              ? 'A trailing zero does not change a decimalâ€™s value. It simply makes the tenths and hundredths columns visible so equal-sized units can be added together.'
               : 'Every digit has a place value. Matching columns keep equal-sized units together.',
         ),
         TutorStepData(
           title: 'Add from right to left',
-          body: isDecimal ? _decimalAdditionWorkingDetailed(l, r, places, resultText) : _integerAdditionWorking(l, r, resultText),
-          why: 'We start with the smallest place. When a column totals 10 or more, the extra ten units are regrouped as 1 unit in the next place.',
+          body: isDecimal
+              ? _decimalAdditionWorkingDetailed(l, r, places, resultText)
+              : _integerAdditionWorking(l, r, resultText),
+          why:
+              'We start with the smallest place. When a column totals 10 or more, the extra ten units are regrouped as 1 unit in the next place.',
         ),
         TutorStepData(
           title: 'Write and check the answer',
-          body: '$l\n+ $r\n──────\n$resultText\n\nEstimate the size first, then compare it with the exact result.',
-          why: 'A check catches common mistakes such as a missed carry, wrong column, or misplaced decimal point.',
+          body:
+              '$l\n+ $r\nâ”€â”€â”€â”€â”€â”€\n$resultText\n\nEstimate the size first, then compare it with the exact result.',
+          why:
+              'A check catches common mistakes such as a missed carry, wrong column, or misplaced decimal point.',
         ),
       ],
       answer: resultText,
@@ -3810,18 +4381,22 @@ TutorSolution solveTutorQuestion(String question) {
     final places = _max(leftPlaces, rightPlaces);
     final l = _padDecimal(leftText, places);
     final r = _padDecimal(rightText, places);
-    final aligned = '  $l\n- $r\n──────\n$resultText';
+    final aligned = '  $l\n- $r\nâ”€â”€â”€â”€â”€â”€\n$resultText';
     return TutorSolution(
       question: cleaned,
       topic: isDecimal ? 'Decimal Subtraction' : 'Subtraction',
       steps: [
         TutorStepData(
           title: 'Understand the question',
-          body: 'We are taking $rightText away from $leftText. The result tells us what remains or the difference between them.',
-          why: 'Subtraction measures a difference or removes one quantity from another.',
+          body:
+              'We are taking $rightText away from $leftText. The result tells us what remains or the difference between them.',
+          why:
+              'Subtraction measures a difference or removes one quantity from another.',
         ),
         TutorStepData(
-          title: isDecimal ? 'Line up the decimal points' : 'Line up the place values',
+          title: isDecimal
+              ? 'Line up the decimal points'
+              : 'Line up the place values',
           body: isDecimal
               ? 'Write the numbers with their decimal points directly under each other:\n\n$aligned'
               : 'Line up ones, tens, hundreds, and other matching place values in columns.',
@@ -3832,12 +4407,15 @@ TutorSolution solveTutorQuestion(String question) {
         TutorStepData(
           title: 'Subtract from right to left',
           body: _subtractionWorking(l, r, resultText, places),
-          why: 'If the top digit is smaller, regroup one unit from the place to its left. One unit in a larger place becomes 10 units in the next smaller place.',
+          why:
+              'If the top digit is smaller, regroup one unit from the place to its left. One unit in a larger place becomes 10 units in the next smaller place.',
         ),
         TutorStepData(
           title: 'Check by adding back',
-          body: '$resultText + $rightText = ${_formatNumber(result + right)}.\nThat returns to the original value $leftText.',
-          why: 'Addition and subtraction are inverse operations, so adding the difference back should restore the starting number.',
+          body:
+              '$resultText + $rightText = ${_formatNumber(result + right)}.\nThat returns to the original value $leftText.',
+          why:
+              'Addition and subtraction are inverse operations, so adding the difference back should restore the starting number.',
         ),
       ],
       answer: resultText,
@@ -3864,19 +4442,24 @@ TutorSolution solveTutorQuestion(String question) {
         TutorStepData(
           title: 'Understand the question',
           body: 'We are multiplying $leftText by $rightText.',
-          why: 'Multiplication finds equal groups and also scales one quantity by another.',
+          why:
+              'Multiplication finds equal groups and also scales one quantity by another.',
         ),
         TutorStepData(
-          title: isDecimal ? 'Temporarily remove the decimal points' : 'Multiply the factors',
+          title: isDecimal
+              ? 'Temporarily remove the decimal points'
+              : 'Multiply the factors',
           body: isDecimal
-              ? 'Treat the factors as whole numbers: $wholeLeft × $wholeRight = $wholeProduct.'
+              ? 'Treat the factors as whole numbers: $wholeLeft Ã— $wholeRight = $wholeProduct.'
               : 'Multiply the digits and build the partial products according to place value.',
           why: isDecimal
               ? 'Whole-number multiplication is easier to perform first. We restore the decimal places afterward based on place value.'
               : 'The standard multiplication method preserves the value of each place and combines the partial products.',
         ),
         TutorStepData(
-          title: isDecimal ? 'Restore the decimal point' : 'Combine the partial products',
+          title: isDecimal
+              ? 'Restore the decimal point'
+              : 'Combine the partial products',
           body: decimalPlacement,
           why: isDecimal
               ? 'The number of decimal places in the factors tells us where the decimal must go in the product so the size of the answer stays correct.'
@@ -3884,56 +4467,67 @@ TutorSolution solveTutorQuestion(String question) {
         ),
         TutorStepData(
           title: 'Check the size',
-          body: 'Estimate the factors first. The exact product is $resultText, which should be in the same general size range as the estimate.',
-          why: 'A size check can reveal a misplaced decimal point or an incorrect multiplication.',
+          body:
+              'Estimate the factors first. The exact product is $resultText, which should be in the same general size range as the estimate.',
+          why:
+              'A size check can reveal a misplaced decimal point or an incorrect multiplication.',
         ),
       ],
       answer: resultText,
       methodSummary: isDecimal
           ? 'Multiply as whole numbers, count all decimal places in the original factors, restore the decimal point, and check the size.'
           : 'Multiply place values carefully, combine partial products, and check the size of the result.',
-      example: isDecimal ? '1.2 × 3.0 = 3.6' : '6 × 4 = 24',
+      example: isDecimal ? '1.2 Ã— 3.0 = 3.6' : '6 Ã— 4 = 24',
       supported: true,
     );
   }
 
   final movePlaces = rightPlaces;
-  final adjustedLeft = movePlaces > 0 ? _formatNumber(left * pow10(movePlaces)) : leftText;
-  final adjustedRight = movePlaces > 0 ? _formatNumber(right * pow10(movePlaces)) : rightText;
+  final adjustedLeft =
+      movePlaces > 0 ? _formatNumber(left * pow10(movePlaces)) : leftText;
+  final adjustedRight =
+      movePlaces > 0 ? _formatNumber(right * pow10(movePlaces)) : rightText;
   return TutorSolution(
     question: cleaned,
     topic: isDecimal ? 'Decimal Division' : 'Division',
     steps: [
       TutorStepData(
         title: 'Understand the question',
-        body: 'We are finding how many groups of $rightText fit into $leftText.',
-        why: 'Division describes equal sharing or how many times one quantity fits into another.',
+        body:
+            'We are finding how many groups of $rightText fit into $leftText.',
+        why:
+            'Division describes equal sharing or how many times one quantity fits into another.',
       ),
       TutorStepData(
-        title: movePlaces > 0 ? 'Make the divisor a whole number' : 'Set up the division',
+        title: movePlaces > 0
+            ? 'Make the divisor a whole number'
+            : 'Set up the division',
         body: movePlaces > 0
-            ? 'Move the decimal point $movePlaces place${movePlaces == 1 ? '' : 's'} in both numbers:\n$leftText ÷ $rightText becomes $adjustedLeft ÷ $adjustedRight.'
-            : 'Set up $leftText ÷ $rightText and work through the quotient one place at a time.',
+            ? 'Move the decimal point $movePlaces place${movePlaces == 1 ? '' : 's'} in both numbers:\n$leftText Ã· $rightText becomes $adjustedLeft Ã· $adjustedRight.'
+            : 'Set up $leftText Ã· $rightText and work through the quotient one place at a time.',
         why: movePlaces > 0
             ? 'Moving both decimal points the same number of places multiplies both numbers by the same power of 10, so the quotient stays the same.'
             : 'The quotient records how many equal groups of the divisor fit into the dividend.',
       ),
       TutorStepData(
         title: 'Divide step-by-step',
-        body: '$adjustedLeft ÷ $adjustedRight = $resultText. Work through the quotient place by place, bringing down digits when necessary.',
-        why: 'Each quotient digit tells us how many groups fit into the current part of the dividend.',
+        body:
+            '$adjustedLeft Ã· $adjustedRight = $resultText. Work through the quotient place by place, bringing down digits when necessary.',
+        why:
+            'Each quotient digit tells us how many groups fit into the current part of the dividend.',
       ),
       TutorStepData(
         title: 'Check by multiplying',
-        body: '$resultText × $rightText = ${_formatNumber(result * right)}.',
-        why: 'Multiplication is the inverse of division, so it can confirm the quotient.',
+        body: '$resultText Ã— $rightText = ${_formatNumber(result * right)}.',
+        why:
+            'Multiplication is the inverse of division, so it can confirm the quotient.',
       ),
     ],
     answer: resultText,
     methodSummary: isDecimal
         ? 'Make the divisor a whole number by moving both decimal points equally, divide, then check by multiplication.'
         : 'Divide one step at a time and confirm the quotient by multiplying it by the divisor.',
-    example: isDecimal ? '6.0 ÷ 1.5 = 4' : '24 ÷ 6 = 4',
+    example: isDecimal ? '6.0 Ã· 1.5 = 4' : '24 Ã· 6 = 4',
     supported: true,
   );
 }
@@ -3948,9 +4542,12 @@ String _integerAdditionWorking(String left, String right, String result) {
     final x = i < a.length ? int.parse(a[i]) : 0;
     final y = i < b.length ? int.parse(b[i]) : 0;
     final total = x + y + carry;
-    lines.add('Column ${i + 1}: $x + $y${carry > 0 ? ' + carried $carry' : ''} = $total.');
+    lines.add(
+        'Column ${i + 1}: $x + $y${carry > 0 ? ' + carried $carry' : ''} = $total.');
     carry = total >= 10 ? 1 : 0;
-    if (carry > 0) lines.add('Because $total is 10 or more, write ${total % 10} and carry 1 to the next column.');
+    if (carry > 0)
+      lines.add(
+          'Because $total is 10 or more, write ${total % 10} and carry 1 to the next column.');
   }
   lines.add('So the completed answer is $result.');
   return lines.join('\n');
@@ -3973,7 +4570,8 @@ String _decimalPlaceName(int indexFromDecimal) {
   }
 }
 
-String _decimalAdditionWorkingDetailed(String left, String right, int places, String result) {
+String _decimalAdditionWorkingDetailed(
+    String left, String right, int places, String result) {
   final lp = left.split('.');
   final rp = right.split('.');
   final wholeA = int.parse(lp[0]);
@@ -3988,27 +4586,35 @@ String _decimalAdditionWorkingDetailed(String left, String right, int places, St
     final y = int.parse(fracB[i]);
     final total = x + y + carry;
     final place = _decimalPlaceName(i);
-    lines.add('${place[0].toUpperCase()}${place.substring(1)}: $x + $y${carry > 0 ? ' + carried $carry' : ''} = $total.');
+    lines.add(
+        '${place[0].toUpperCase()}${place.substring(1)}: $x + $y${carry > 0 ? ' + carried $carry' : ''} = $total.');
     carry = total >= 10 ? 1 : 0;
     if (carry > 0) {
-      lines.add('Write ${total % 10} in the $place place and carry 1 to the next place.');
+      lines.add(
+          'Write ${total % 10} in the $place place and carry 1 to the next place.');
     } else {
       lines.add('Write $total in the $place place.');
     }
   }
   final wholeTotal = wholeA + wholeB + carry;
-  lines.add('Whole numbers: $wholeA + $wholeB${carry > 0 ? ' + carried $carry' : ''} = $wholeTotal.');
+  lines.add(
+      'Whole numbers: $wholeA + $wholeB${carry > 0 ? ' + carried $carry' : ''} = $wholeTotal.');
   lines.add('Keep the decimal point directly under the decimal points above.');
   lines.add('That gives $result.');
   return lines.join('\n');
 }
 
-String _subtractionWorking(String left, String right, String result, int places) {
+String _subtractionWorking(
+    String left, String right, String result, int places) {
   final lines = <String>[];
   lines.add('Work from the smallest place value to the left.');
-  lines.add('If the top digit is too small, regroup one unit from the column to its left.');
-  if (places > 0) lines.add('Because the decimal points are aligned, each decimal column represents the same unit.');
-  lines.add('Complete the column subtraction and keep the decimal point in the same column.');
+  lines.add(
+      'If the top digit is too small, regroup one unit from the column to its left.');
+  if (places > 0)
+    lines.add(
+        'Because the decimal points are aligned, each decimal column represents the same unit.');
+  lines.add(
+      'Complete the column subtraction and keep the decimal point in the same column.');
   lines.add('Result: $result.');
   return lines.join('\n');
 }
@@ -4034,8 +4640,12 @@ String _padDecimal(String value, int places) {
 }
 
 String _formatNumber(double value) {
-  if (value.isFinite && value == value.roundToDouble()) return value.toInt().toString();
-  return value.toStringAsFixed(10).replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
+  if (value.isFinite && value == value.roundToDouble())
+    return value.toInt().toString();
+  return value
+      .toStringAsFixed(10)
+      .replaceFirst(RegExp(r'0+$'), '')
+      .replaceFirst(RegExp(r'\.$'), '');
 }
 
 class QuestionResultScreen extends StatefulWidget {
@@ -4067,7 +4677,10 @@ class _QuestionResultScreenState extends State<QuestionResultScreen> {
     super.dispose();
   }
 
-  Future<void> _askTutor({String? preset, int? stepIndex, TextEditingController? controller}) async {
+  Future<void> _askTutor(
+      {String? preset,
+      int? stepIndex,
+      TextEditingController? controller}) async {
     final activeController = controller ?? _askController;
     final question = (preset ?? activeController.text).trim();
     if (question.isEmpty) return;
@@ -4089,29 +4702,43 @@ class _QuestionResultScreenState extends State<QuestionResultScreen> {
     });
   }
 
-  String _explainFollowUp(String question, TutorSolution solution, {int? stepIndex}) {
+  String _explainFollowUp(String question, TutorSolution solution,
+      {int? stepIndex}) {
     final q = question.toLowerCase();
-    final parsedStep = RegExp(r'(?:step\s*)?(\d+)', caseSensitive: false).firstMatch(q);
+    final parsedStep =
+        RegExp(r'(?:step\s*)?(\d+)', caseSensitive: false).firstMatch(q);
     final requestedStep = stepIndex ??
         (parsedStep != null ? int.tryParse(parsedStep.group(1)!) : null) ??
         _lastAskedStep;
-    if (requestedStep != null && requestedStep >= 1 && requestedStep <= solution.steps.length &&
-        (q.contains('why') || q.contains('how') || q.contains('that') || q.contains('this') || q.contains('step'))) {
+    if (requestedStep != null &&
+        requestedStep >= 1 &&
+        requestedStep <= solution.steps.length &&
+        (q.contains('why') ||
+            q.contains('how') ||
+            q.contains('that') ||
+            q.contains('this') ||
+            q.contains('step'))) {
       _lastAskedStep = requestedStep;
       final step = solution.steps[requestedStep - 1];
-      return 'Let’s use Step $requestedStep from your exact question.\n\n**What the step does:**\n${step.body}\n\n**Why we do it:**\n${step.why}\n\n**What changes after this step:**\nThe work becomes one smaller piece of the original problem, which makes the next step easier to perform and check.\n\nIf this is still unclear, tell me which word, number, carry, fraction, or operation is confusing you and I will break that exact part down again.';
+      return 'Letâ€™s use Step $requestedStep from your exact question.\n\n**What the step does:**\n${step.body}\n\n**Why we do it:**\n${step.why}\n\n**What changes after this step:**\nThe work becomes one smaller piece of the original problem, which makes the next step easier to perform and check.\n\nIf this is still unclear, tell me which word, number, carry, fraction, or operation is confusing you and I will break that exact part down again.';
     }
 
     if (q.contains('another') || q.contains('example')) {
       return 'Here is another ${solution.topic.toLowerCase()} example:\n\n${solution.example}\n\nFirst try it using the same method. Then compare your work with the steps you learned. If you get stuck, tell me the exact step where you got stuck.';
     }
 
-    if (q.contains('simpl') || q.contains('easier') || q.contains('slow') || q.contains('still')) {
+    if (q.contains('simpl') ||
+        q.contains('easier') ||
+        q.contains('slow') ||
+        q.contains('still')) {
       return _buildDeeperExplanation(solution, _deeperExplanationRound + 1);
     }
 
-    if (q.contains('why') && solution.topic.toLowerCase().contains('percentage')) {
-      final m = RegExp(r'(-?(?:\d+(?:\.\d+)?|\.\d+))\s*%\s*of\s*(-?(?:\d+(?:\.\d+)?|\.\d+))', caseSensitive: false)
+    if (q.contains('why') &&
+        solution.topic.toLowerCase().contains('percentage')) {
+      final m = RegExp(
+              r'(-?(?:\d+(?:\.\d+)?|\.\d+))\s*%\s*of\s*(-?(?:\d+(?:\.\d+)?|\.\d+))',
+              caseSensitive: false)
           .firstMatch(_normalizeQuestion(solution.question));
       if (m != null) {
         final pText = m.group(1)!;
@@ -4119,12 +4746,14 @@ class _QuestionResultScreenState extends State<QuestionResultScreen> {
         final p = double.parse(pText);
         final decimal = _formatNumber(p / 100);
         final answer = _formatNumber(double.parse(baseText) * p / 100);
-        return 'Let’s use your exact percentage question: $pText% of $baseText.\n\nA percent means “out of 100”. So $pText% means $pText out of 100.\n\nDivide $pText by 100:\n$pText ÷ 100 = $decimal.\n\nThen multiply the whole amount by that decimal:\n$decimal × $baseText = $answer.\n\nWhy do we do that? Because $pText% is the same as the fraction $pText/100. Multiplying by that fraction takes exactly that part of the whole amount.\n\nSo the answer is $answer, and the decimal conversion is what makes the percentage usable in a multiplication.';
+        return 'Letâ€™s use your exact percentage question: $pText% of $baseText.\n\nA percent means â€œout of 100â€. So $pText% means $pText out of 100.\n\nDivide $pText by 100:\n$pText Ã· 100 = $decimal.\n\nThen multiply the whole amount by that decimal:\n$decimal Ã— $baseText = $answer.\n\nWhy do we do that? Because $pText% is the same as the fraction $pText/100. Multiplying by that fraction takes exactly that part of the whole amount.\n\nSo the answer is $answer, and the decimal conversion is what makes the percentage usable in a multiplication.';
       }
     }
 
-    if (q.contains('why') && solution.topic.toLowerCase().contains('fraction')) {
-      final m = RegExp(r'(-?\d+\s*/\s*\d+)\s*([+\-*/])\s*(-?\d+\s*/\s*\d+)', caseSensitive: false)
+    if (q.contains('why') &&
+        solution.topic.toLowerCase().contains('fraction')) {
+      final m = RegExp(r'(-?\d+\s*/\s*\d+)\s*([+\-*/])\s*(-?\d+\s*/\s*\d+)',
+              caseSensitive: false)
           .firstMatch(_normalizeQuestion(solution.question));
       if (m != null) {
         final a = _parseFraction(m.group(1)!);
@@ -4135,42 +4764,52 @@ class _QuestionResultScreenState extends State<QuestionResultScreen> {
             final common = a.denominator * b.denominator;
             final leftNumerator = a.numerator * b.denominator;
             final rightNumerator = b.numerator * a.denominator;
-            final combined = op == '+' ? leftNumerator + rightNumerator : leftNumerator - rightNumerator;
-            return 'Let’s use your exact fractions: ${a.display} $op ${b.display}.\n\nFor addition or subtraction, the pieces must be the same size before we combine them. That is why we create a common denominator.\n\nUsing $common as a common denominator:\n${a.display} = $leftNumerator/$common\n${b.display} = $rightNumerator/$common\n\nNow both fractions describe pieces of the same size, so we can ${op == '+' ? 'add' : 'subtract'} the numerators:\n$leftNumerator $op $rightNumerator = $combined.\n\nThe denominator stays $common because the size of each piece did not change. Then we simplify the resulting fraction.\n\nThat is the reason for the common denominator — it makes the fractional pieces comparable.';
+            final combined = op == '+'
+                ? leftNumerator + rightNumerator
+                : leftNumerator - rightNumerator;
+            return 'Letâ€™s use your exact fractions: ${a.display} $op ${b.display}.\n\nFor addition or subtraction, the pieces must be the same size before we combine them. That is why we create a common denominator.\n\nUsing $common as a common denominator:\n${a.display} = $leftNumerator/$common\n${b.display} = $rightNumerator/$common\n\nNow both fractions describe pieces of the same size, so we can ${op == '+' ? 'add' : 'subtract'} the numerators:\n$leftNumerator $op $rightNumerator = $combined.\n\nThe denominator stays $common because the size of each piece did not change. Then we simplify the resulting fraction.\n\nThat is the reason for the common denominator â€” it makes the fractional pieces comparable.';
           }
           if (op == '*') {
             final result = _fractionMultiply(a, b);
-            return 'For ${a.display} × ${b.display}, multiply the numerators and multiply the denominators:\n\n${a.numerator} × ${b.numerator} = ${a.numerator * b.numerator}\n${a.denominator} × ${b.denominator} = ${a.denominator * b.denominator}\n\nSo we get ${a.numerator * b.numerator}/${a.denominator * b.denominator}, which simplifies to ${result.display}.\n\nWhy? Multiplying fractions is combining a part of one quantity with a part of another.';
+            return 'For ${a.display} Ã— ${b.display}, multiply the numerators and multiply the denominators:\n\n${a.numerator} Ã— ${b.numerator} = ${a.numerator * b.numerator}\n${a.denominator} Ã— ${b.denominator} = ${a.denominator * b.denominator}\n\nSo we get ${a.numerator * b.numerator}/${a.denominator * b.denominator}, which simplifies to ${result.display}.\n\nWhy? Multiplying fractions is combining a part of one quantity with a part of another.';
           }
           if (op == '/') {
             final result = _fractionDivide(a, b);
-            return 'For ${a.display} ÷ ${b.display}, keep the first fraction, change division to multiplication, and flip the second fraction:\n\n${a.display} × ${b.denominator}/${b.numerator}\n\nThen multiply:\n${a.numerator} × ${b.denominator} / (${a.denominator} × ${b.numerator}) = ${result.display}.\n\nWhy? Dividing by a fraction asks how many groups of that fractional size fit into the first fraction. Multiplying by the reciprocal gives that number of groups.';
+            return 'For ${a.display} Ã· ${b.display}, keep the first fraction, change division to multiplication, and flip the second fraction:\n\n${a.display} Ã— ${b.denominator}/${b.numerator}\n\nThen multiply:\n${a.numerator} Ã— ${b.denominator} / (${a.denominator} Ã— ${b.numerator}) = ${result.display}.\n\nWhy? Dividing by a fraction asks how many groups of that fractional size fit into the first fraction. Multiplying by the reciprocal gives that number of groups.';
           }
         }
       }
     }
 
     if (q.contains('why') && solution.topic.toLowerCase().contains('algebra')) {
-      final m = RegExp(r'(-?\d*\.?\d*)x\s*([+\-])\s*(-?\d+(?:\.\d+)?)\s*=\s*(-?\d+(?:\.\d+)?)', caseSensitive: false)
-          .firstMatch(_normalizeQuestion(solution.question).replaceAll(' ', ''));
+      final m = RegExp(
+              r'(-?\d*\.?\d*)x\s*([+\-])\s*(-?\d+(?:\.\d+)?)\s*=\s*(-?\d+(?:\.\d+)?)',
+              caseSensitive: false)
+          .firstMatch(
+              _normalizeQuestion(solution.question).replaceAll(' ', ''));
       if (m != null) {
         final aRaw = m.group(1)!;
-        final a = aRaw.isEmpty ? 1.0 : (aRaw == '-' ? -1.0 : double.parse(aRaw));
+        final a =
+            aRaw.isEmpty ? 1.0 : (aRaw == '-' ? -1.0 : double.parse(aRaw));
         final sign = m.group(2)!;
         final bValue = double.parse(m.group(3)!);
         final b = sign == '+' ? bValue : -bValue;
         final c = double.parse(m.group(4)!);
         final isolate = c - b;
         final x = isolate / a;
-        if (q.contains('divide') || q.contains('coefficient') || q.contains('2')) {
-          return 'Let’s use the exact equation from your question.\n\nThe coefficient of x is ${_formatNumber(a)}. After removing the constant, the equation becomes:\n${_formatNumber(a)}x = ${_formatNumber(isolate)}\n\nWe then divide both sides by ${_formatNumber(a)}:\n${_formatNumber(a)}x ÷ ${_formatNumber(a)} = ${_formatNumber(isolate)} ÷ ${_formatNumber(a)}\n\nx = ${_formatNumber(x)}.\n\nWhy? Multiplication by ${_formatNumber(a)} and division by ${_formatNumber(a)} are inverse operations. Dividing undoes the coefficient so x can stand by itself.\n\nFinally, substitute x = ${_formatNumber(x)} back into the original equation to make sure both sides are equal.';
+        if (q.contains('divide') ||
+            q.contains('coefficient') ||
+            q.contains('2')) {
+          return 'Letâ€™s use the exact equation from your question.\n\nThe coefficient of x is ${_formatNumber(a)}. After removing the constant, the equation becomes:\n${_formatNumber(a)}x = ${_formatNumber(isolate)}\n\nWe then divide both sides by ${_formatNumber(a)}:\n${_formatNumber(a)}x Ã· ${_formatNumber(a)} = ${_formatNumber(isolate)} Ã· ${_formatNumber(a)}\n\nx = ${_formatNumber(x)}.\n\nWhy? Multiplication by ${_formatNumber(a)} and division by ${_formatNumber(a)} are inverse operations. Dividing undoes the coefficient so x can stand by itself.\n\nFinally, substitute x = ${_formatNumber(x)} back into the original equation to make sure both sides are equal.';
         }
         return 'An equation is a balance. In your exact equation, we first remove the constant term so the x-term is by itself. Then we undo the coefficient by dividing both sides by the same number. We must perform the same operation on both sides so the balance is preserved.\n\nFor your question, that process leads to x = ${_formatNumber(x)} and substitution confirms the result.';
       }
     }
 
-    if (q.contains('why') && solution.topic.toLowerCase().contains('decimal addition')) {
-      final m = RegExp(r'^\s*(-?(?:\d+(?:\.\d+)?|\.\d+))\s*\+\s*(-?(?:\d+(?:\.\d+)?|\.\d+))\s*$')
+    if (q.contains('why') &&
+        solution.topic.toLowerCase().contains('decimal addition')) {
+      final m = RegExp(
+              r'^\s*(-?(?:\d+(?:\.\d+)?|\.\d+))\s*\+\s*(-?(?:\d+(?:\.\d+)?|\.\d+))\s*$')
           .firstMatch(_normalizeQuestion(solution.question));
       if (m != null) {
         final a = m.group(1)!;
@@ -4191,7 +4830,11 @@ class _QuestionResultScreenState extends State<QuestionResultScreen> {
         final tenthsSum = aTenths + bTenths + carryTenths;
         final carryWhole = tenthsSum >= 10 ? 1 : 0;
         final wholeSubtotal = aWhole + bWhole;
-        if (q.contains('15') || q.contains('16') || q.contains('change') || q.contains('become') || q.contains('carry')) {
+        if (q.contains('15') ||
+            q.contains('16') ||
+            q.contains('change') ||
+            q.contains('become') ||
+            q.contains('carry')) {
           final finalWhole = wholeSubtotal + carryWhole;
           final hundredDigit = hundredSum % 10;
           final tenthsDigit = tenthsSum % 10;
@@ -4199,7 +4842,7 @@ class _QuestionResultScreenState extends State<QuestionResultScreen> {
 
 1. Whole-number part:
 $aWhole + $bWhole = $wholeSubtotal.
-That is only the whole-number subtotal — we are not finished yet.
+That is only the whole-number subtotal â€” we are not finished yet.
 
 2. Hundredths:
 $aHund + $bHund = $hundredSum.
@@ -4221,7 +4864,7 @@ Therefore the complete answer is **${solution.answer}**.
 
 The key idea is that the number did not randomly change. An extra whole was created from the decimal part through regrouping.''';
         }
-        return 'For your exact decimal question, decimal points line up because they keep equal place values together: ones under ones, tenths under tenths, and hundredths under hundredths. A digit changes its value when it moves to a different place, so aligning the decimal points protects the value of every digit.\n\nFor this problem:\n  $ap\n+ $bp\n──────\nThe decimal point stays in the same column while the digits are added.';
+        return 'For your exact decimal question, decimal points line up because they keep equal place values together: ones under ones, tenths under tenths, and hundredths under hundredths. A digit changes its value when it moves to a different place, so aligning the decimal points protects the value of every digit.\n\nFor this problem:\n  $ap\n+ $bp\nâ”€â”€â”€â”€â”€â”€\nThe decimal point stays in the same column while the digits are added.';
       }
     }
 
@@ -4229,47 +4872,57 @@ The key idea is that the number did not randomly change. An extra whole was crea
       return 'Here is the complete method for **${solution.topic}**:\n\n${solution.methodSummary}\n\nThen work through the lesson in order:\n\n${solution.steps.asMap().entries.map((e) => 'Step ${e.key + 1}: ${e.value.body}').join('\n\n')}';
     }
 
-    if (q.contains('check') || q.contains('correct') || q.contains('right answer')) {
-      return "Let’s verify the exact lesson instead of trusting the final number.\n\n${solution.steps.asMap().entries.map((e) => 'Step ${e.key + 1}: ${e.value.title}\n${e.value.body}').join('\n\n')}\n\nFinal answer: ${solution.answer}\n\nThe key check is to use the inverse operation, substitution, estimation, or a place-value check appropriate to this topic.";
+    if (q.contains('check') ||
+        q.contains('correct') ||
+        q.contains('right answer')) {
+      return "Letâ€™s verify the exact lesson instead of trusting the final number.\n\n${solution.steps.asMap().entries.map((e) => 'Step ${e.key + 1}: ${e.value.title}\n${e.value.body}').join('\n\n')}\n\nFinal answer: ${solution.answer}\n\nThe key check is to use the inverse operation, substitution, estimation, or a place-value check appropriate to this topic.";
     }
 
-    return 'I can explain this exact question, not just give a rule. Tell me the specific part you do not understand — for example, “Why did we carry 1?”, “Why did 15 become 16?”, “Why did we use a common denominator?”, or “Why did we divide by 2?”';
+    return 'I can explain this exact question, not just give a rule. Tell me the specific part you do not understand â€” for example, â€œWhy did we carry 1?â€, â€œWhy did 15 become 16?â€, â€œWhy did we use a common denominator?â€, or â€œWhy did we divide by 2?â€';
   }
 
   String _practiceQuestionFor(TutorSolution solution) {
     final topic = solution.topic.toLowerCase();
     if (topic.contains('percentage')) return '20% of 150';
-    if (topic.contains('fraction') && topic.contains('addition')) return '1/2 + 1/4';
-    if (topic.contains('fraction') && topic.contains('subtraction')) return '3/4 - 1/4';
-    if (topic.contains('fraction') && topic.contains('multiplication')) return '2/3 × 3/4';
-    if (topic.contains('fraction') && topic.contains('division')) return '1/2 ÷ 1/4';
+    if (topic.contains('fraction') && topic.contains('addition'))
+      return '1/2 + 1/4';
+    if (topic.contains('fraction') && topic.contains('subtraction'))
+      return '3/4 - 1/4';
+    if (topic.contains('fraction') && topic.contains('multiplication'))
+      return '2/3 Ã— 3/4';
+    if (topic.contains('fraction') && topic.contains('division'))
+      return '1/2 Ã· 1/4';
     if (topic.contains('algebra')) return '2x + 5 = 15';
     if (topic.contains('decimal addition')) return '4.50 + 2.25';
     if (topic.contains('decimal subtraction')) return '8.40 - 3.25';
-    if (topic.contains('decimal multiplication')) return '1.2 × 3.0';
-    if (topic.contains('decimal division')) return '6.0 ÷ 1.5';
+    if (topic.contains('decimal multiplication')) return '1.2 Ã— 3.0';
+    if (topic.contains('decimal division')) return '6.0 Ã· 1.5';
     if (topic.contains('addition')) return '23 + 15';
     if (topic.contains('subtraction')) return '42 - 17';
-    if (topic.contains('multiplication')) return '6 × 4';
-    if (topic.contains('division')) return '24 ÷ 6';
+    if (topic.contains('multiplication')) return '6 Ã— 4';
+    if (topic.contains('division')) return '24 Ã· 6';
     return solution.example;
   }
 
   void _markUnderstanding(String status) {
     setState(() => _understandingStatus = status);
     if (status == 'understand') {
-      _tutorReplies.add('TutorAI: Excellent. The next step is practice so you can prove you can do it yourself.');
+      _tutorReplies.add(
+          'TutorAI: Excellent. The next step is practice so you can prove you can do it yourself.');
     } else {
       _deeperExplanationRound += 1;
-      _tutorReplies.add('TutorAI: No problem. I will explain the same idea again using smaller pieces, the exact numbers from your question, and a fresh example.');
-      _tutorReplies.add('TutorAI: ${_buildDeeperExplanation(widget.solution, _deeperExplanationRound)}');
+      _tutorReplies.add(
+          'TutorAI: No problem. I will explain the same idea again using smaller pieces, the exact numbers from your question, and a fresh example.');
+      _tutorReplies.add(
+          'TutorAI: ${_buildDeeperExplanation(widget.solution, _deeperExplanationRound)}');
     }
     setState(() {});
   }
 
   String _buildDeeperExplanation(TutorSolution solution, int round) {
     if (solution.topic.toLowerCase().contains('decimal addition')) {
-      final m = RegExp(r'^\s*(-?(?:\d+(?:\.\d+)?|\.\d+))\s*\+\s*(-?(?:\d+(?:\.\d+)?|\.\d+))\s*$')
+      final m = RegExp(
+              r'^\s*(-?(?:\d+(?:\.\d+)?|\.\d+))\s*\+\s*(-?(?:\d+(?:\.\d+)?|\.\d+))\s*$')
           .firstMatch(_normalizeQuestion(solution.question));
       if (m != null) {
         final a = m.group(1)!;
@@ -4299,7 +4952,7 @@ The key idea is that the number did not randomly change. An extra whole was crea
     }
     final firstStep = solution.steps.isNotEmpty ? solution.steps.first : null;
     final secondStep = solution.steps.length > 1 ? solution.steps[1] : null;
-    return 'Let’s rebuild this lesson in a different way.\n\n'
+    return 'Letâ€™s rebuild this lesson in a different way.\n\n'
         '1. Say the question in your own words.\n'
         '${firstStep == null ? '' : '2. Start with: ${firstStep.title}.\n${firstStep.body}\n\nWhy? ${firstStep.why}\n\n'}'
         '${secondStep == null ? '' : '3. Then move to: ${secondStep.title}.\n${secondStep.body}\n\nWhy? ${secondStep.why}\n\n'}'
@@ -4309,10 +4962,13 @@ The key idea is that the number did not randomly change. An extra whole was crea
 
   bool _answersEquivalent(String entered, String expected) {
     final cleanEntered = entered.trim().replaceAll(',', '').replaceAll(' ', '');
-    final cleanExpected = expected.trim().replaceAll(',', '').replaceAll(' ', '');
+    final cleanExpected =
+        expected.trim().replaceAll(',', '').replaceAll(' ', '');
     if (cleanEntered == cleanExpected) return true;
 
-    final normalizedExpected = cleanExpected.startsWith('x=') ? cleanExpected.substring(2) : cleanExpected;
+    final normalizedExpected = cleanExpected.startsWith('x=')
+        ? cleanExpected.substring(2)
+        : cleanExpected;
     final ef = _parseFraction(cleanEntered);
     final xf = _parseFraction(normalizedExpected);
     if (ef != null && xf != null) return ef.value == xf.value;
@@ -4346,305 +5002,453 @@ The key idea is that the number did not randomly change. An extra whole was crea
         child: ListView(
           padding: const EdgeInsets.all(18),
           children: [
-          _ResultCard(
-            title: 'Question',
-            child: Text(solution.question, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, height: 1.35)),
-          ),
-          const SizedBox(height: 14),
-          _ResultCard(
-            title: 'Your lesson plan',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(solution.topic, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF14213D))),
-                const SizedBox(height: 7),
-                const Text('Understand → Learn the method → Work each step → Understand why → Check → Practice', style: TextStyle(color: Color(0xFF53637A), height: 1.45)),
-              ],
+            _ResultCard(
+              title: 'Question',
+              child: Text(solution.question,
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.w800, height: 1.35)),
             ),
-          ),
-          const SizedBox(height: 14),
-          _ResultCard(
-            title: 'Key idea',
-            child: Text(
-              _keyIdeaForTopic(solution.topic),
-              style: const TextStyle(color: Color(0xFF53637A), height: 1.5, fontSize: 14),
-            ),
-          ),
-          const SizedBox(height: 14),
-          _ResultCard(
-            title: 'TutorAI learning coach',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Use the lesson actively: explain the next step in your own words before reading the answer, then use Practice to test independent understanding.',
-                  style: TextStyle(color: Color(0xFF53637A), height: 1.5, fontSize: 14),
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: () => _askTutor(preset: 'Teach me the key idea in one very simple sentence, then give me one question to test it.'),
-                      icon: const Icon(Icons.psychology_alt_outlined, size: 17),
-                      label: const Text('Coach Me'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => _askTutor(preset: 'Check my reasoning strategy for this question and tell me what a careful student should watch for.'),
-                      icon: const Icon(Icons.fact_check_outlined, size: 17),
-                      label: const Text('Check My Reasoning'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          _ResultCard(
-            title: 'Common mistake to avoid',
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.warning_amber_rounded, color: Color(0xFFB46A00)),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Text(
-                    _commonMistakeForTopic(solution.topic),
-                    style: const TextStyle(color: Color(0xFF53637A), height: 1.5, fontSize: 14),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          _ResultCard(
-            title: 'Learning objective',
-            child: Text(
-              _learningObjectiveForTopic(solution.topic),
-              style: const TextStyle(color: Color(0xFF53637A), height: 1.5, fontSize: 14),
-            ),
-          ),
-          const SizedBox(height: 14),
-          _ResultCard(
-            title: 'How you know you understand',
-            child: Text(
-              _masteryCheckForTopic(solution.topic),
-              style: const TextStyle(color: Color(0xFF53637A), height: 1.5, fontSize: 14),
-            ),
-          ),
-          const SizedBox(height: 14),
-          _ResultCard(
-            title: solution.supported ? 'Detailed step-by-step lesson' : 'Let’s clarify the question',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (solution.supported)
-                  for (var i = 0; i < solution.steps.length; i++) ...[
-                    _Step(number: '${i + 1}', title: solution.steps[i].title, body: '${solution.steps[i].body}\n\nWhy this works:\n${solution.steps[i].why}', onAsk: () => _askTutor(stepIndex: i + 1, preset: 'Why is Step ${i + 1} like that?')),
-                    if (i != solution.steps.length - 1) const Divider(height: 28),
-                  ]
-                else
-                  for (var i = 0; i < solution.steps.length; i++) ...[
-                    _Step(number: '${i + 1}', title: solution.steps[i].title, body: '${solution.steps[i].body}\n\nWhy this matters:\n${solution.steps[i].why}'),
-                  ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          _ResultCard(
-            title: 'Answer',
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: const Color(0xFFE1F8EA), borderRadius: BorderRadius.circular(16)),
-              child: Text(solution.answer, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF1B6B49))),
-            ),
-          ),
-          const SizedBox(height: 14),
-          _ResultCard(
-            title: 'If you are not satisfied with the explanation',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Tell TutorAI exactly what is confusing you. It will not simply repeat the same answer — it will change the teaching approach and go deeper.', style: TextStyle(color: Color(0xFF5E6D81), height: 1.45)),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    ElevatedButton.icon(onPressed: () => _markUnderstanding('understand'), icon: const Icon(Icons.check_circle_outline_rounded, size: 18), label: const Text('Yes, I understand')),
-                    OutlinedButton.icon(onPressed: () => _markUnderstanding('more'), icon: const Icon(Icons.more_horiz_rounded, size: 18), label: const Text('Explain More')),
-                    OutlinedButton.icon(onPressed: () => _askTutor(preset: 'Explain this more simply using the exact numbers.'), icon: const Icon(Icons.menu_book_rounded, size: 18), label: const Text('Simpler')),
-                    OutlinedButton.icon(onPressed: () => _askTutor(preset: 'Give me another worked example and explain every step.'), icon: const Icon(Icons.lightbulb_outline_rounded, size: 18), label: const Text('Another Example')),
-                  ],
-                ),
-                if (_understandingStatus != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    _understandingStatus == 'understand'
-                        ? '✅ Great. Let’s prove it with a short practice question.'
-                        : '💡 No problem. I have added a deeper explanation. You can keep asking until it is clear.',
-                    style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF2C4D78)),
-                  ),
+            const SizedBox(height: 14),
+            _ResultCard(
+              title: 'Your lesson plan',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(solution.topic,
+                      style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF14213D))),
+                  const SizedBox(height: 7),
+                  const Text(
+                      'Understand â†’ Learn the method â†’ Work each step â†’ Understand why â†’ Check â†’ Practice',
+                      style: TextStyle(color: Color(0xFF53637A), height: 1.45)),
                 ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          _ResultCard(
-            title: 'What do you not understand?',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Write the exact part that is confusing you. For example: “Why did 15 become 16?”, “Why do I need a common denominator?”, or “Why did we divide by 2?”', style: TextStyle(color: Color(0xFF5E6D81), height: 1.45)),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: _askController,
-                  minLines: 3,
-                  maxLines: 6,
-                  textInputAction: TextInputAction.newline,
-                  decoration: InputDecoration(
-                    hintText: 'Tell TutorAI exactly what you do not understand...',
-                    filled: true,
-                    fillColor: const Color(0xFFF8FAFD),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFDDE6F2))),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    onPressed: _sending ? null : () => _askTutor(controller: _askController),
-                    icon: _sending ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2.3, color: Colors.white)) : const Icon(Icons.auto_awesome_rounded),
-                    label: Text(_sending ? 'Explaining...' : "Explain What I Don't Understand"),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          _ResultCard(
-            title: 'Ask TutorAI',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Ask anything about the lesson at any time. TutorAI will use the current question and lesson steps as context.', style: TextStyle(color: Color(0xFF5E6D81), height: 1.45)),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: _conversationController,
-                  minLines: 2,
-                  maxLines: 4,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => _sending ? null : _askTutor(controller: _conversationController),
-                  decoration: InputDecoration(
-                    hintText: 'Ask TutorAI a question...',
-                    filled: true,
-                    fillColor: const Color(0xFFF8FAFD),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFDDE6F2))),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    onPressed: _sending ? null : () => _askTutor(controller: _conversationController),
-                    icon: _sending ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2.3, color: Colors.white)) : const Icon(Icons.chat_bubble_outline_rounded),
-                    label: Text(_sending ? 'Thinking...' : 'Ask Tutor'),
-                  ),
-                ),
-                if (_tutorReplies.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  for (final reply in _tutorReplies) Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: reply.startsWith('TutorAI:') ? const Color(0xFFEAF2FF) : const Color(0xFFF4F5F7), borderRadius: BorderRadius.circular(14)),
-                    child: Text(reply, style: const TextStyle(color: Color(0xFF32435D), height: 1.45)),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          _ResultCard(
-            title: 'Practice — show me you understand',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Now solve a similar question yourself. TutorAI will mark the answer, explain mistakes, and let you ask for help again.', style: TextStyle(color: Color(0xFF5E6D81), height: 1.45)),
-                const SizedBox(height: 10),
-                Text(_practiceQuestionFor(solution), style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: Color(0xFF14213D))),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: _practiceController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                  decoration: InputDecoration(
-                    hintText: 'Your answer',
-                    filled: true,
-                    fillColor: const Color(0xFFF8FAFD),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFDDE6F2))),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton.icon(onPressed: _checkPractice, icon: const Icon(Icons.check_rounded), label: const Text('Check My Answer')),
-                ),
-                if (_practiceChecked) ...[
-                  const SizedBox(height: 10),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: _practiceCorrect == true ? const Color(0xFFE1F8EA) : const Color(0xFFFFF1F1), borderRadius: BorderRadius.circular(14)),
-                    child: Text(_practiceFeedback, style: TextStyle(color: _practiceCorrect == true ? const Color(0xFF1B6B49) : const Color(0xFF9B3030), fontWeight: FontWeight.w700, height: 1.45)),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          _ResultCard(
-            title: 'One more example',
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(solution.example, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF14213D))),
-              const SizedBox(height: 8),
-              const Text('Try to explain to yourself why the method works before looking for help.', style: TextStyle(color: Color(0xFF5E6D81), height: 1.4)),
-            ]),
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Ask Another'),
-                ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Practice is ready below. Try it and check your answer.'),
+            ),
+            const SizedBox(height: 14),
+            _ResultCard(
+              title: 'Key idea',
+              child: Text(
+                _keyIdeaForTopic(solution.topic),
+                style: const TextStyle(
+                    color: Color(0xFF53637A), height: 1.5, fontSize: 14),
+              ),
+            ),
+            const SizedBox(height: 14),
+            _ResultCard(
+              title: 'TutorAI learning coach',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Use the lesson actively: explain the next step in your own words before reading the answer, then use Practice to test independent understanding.',
+                    style: TextStyle(
+                        color: Color(0xFF53637A), height: 1.5, fontSize: 14),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _askTutor(
+                            preset:
+                                'Teach me the key idea in one very simple sentence, then give me one question to test it.'),
+                        icon:
+                            const Icon(Icons.psychology_alt_outlined, size: 17),
+                        label: const Text('Coach Me'),
                       ),
-                    );
-                  },
-                  child: const Text('Practice Below →'),
-                ),
+                      OutlinedButton.icon(
+                        onPressed: () => _askTutor(
+                            preset:
+                                'Check my reasoning strategy for this question and tell me what a careful student should watch for.'),
+                        icon: const Icon(Icons.fact_check_outlined, size: 17),
+                        label: const Text('Check My Reasoning'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 14),
+            _ResultCard(
+              title: 'Common mistake to avoid',
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      color: Color(0xFFB46A00)),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      _commonMistakeForTopic(solution.topic),
+                      style: const TextStyle(
+                          color: Color(0xFF53637A), height: 1.5, fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            _ResultCard(
+              title: 'Learning objective',
+              child: Text(
+                _learningObjectiveForTopic(solution.topic),
+                style: const TextStyle(
+                    color: Color(0xFF53637A), height: 1.5, fontSize: 14),
+              ),
+            ),
+            const SizedBox(height: 14),
+            _ResultCard(
+              title: 'How you know you understand',
+              child: Text(
+                _masteryCheckForTopic(solution.topic),
+                style: const TextStyle(
+                    color: Color(0xFF53637A), height: 1.5, fontSize: 14),
+              ),
+            ),
+            const SizedBox(height: 14),
+            _ResultCard(
+              title: solution.supported
+                  ? 'Detailed step-by-step lesson'
+                  : 'Letâ€™s clarify the question',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (solution.supported)
+                    for (var i = 0; i < solution.steps.length; i++) ...[
+                      _Step(
+                          number: '${i + 1}',
+                          title: solution.steps[i].title,
+                          body:
+                              '${solution.steps[i].body}\n\nWhy this works:\n${solution.steps[i].why}',
+                          onAsk: () => _askTutor(
+                              stepIndex: i + 1,
+                              preset: 'Why is Step ${i + 1} like that?')),
+                      if (i != solution.steps.length - 1)
+                        const Divider(height: 28),
+                    ]
+                  else
+                    for (var i = 0; i < solution.steps.length; i++) ...[
+                      _Step(
+                          number: '${i + 1}',
+                          title: solution.steps[i].title,
+                          body:
+                              '${solution.steps[i].body}\n\nWhy this matters:\n${solution.steps[i].why}'),
+                    ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            _ResultCard(
+              title: 'Answer',
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                    color: const Color(0xFFE1F8EA),
+                    borderRadius: BorderRadius.circular(16)),
+                child: Text(solution.answer,
+                    style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF1B6B49))),
+              ),
+            ),
+            const SizedBox(height: 14),
+            _ResultCard(
+              title: 'If you are not satisfied with the explanation',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                      'Tell TutorAI exactly what is confusing you. It will not simply repeat the same answer â€” it will change the teaching approach and go deeper.',
+                      style: TextStyle(color: Color(0xFF5E6D81), height: 1.45)),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ElevatedButton.icon(
+                          onPressed: () => _markUnderstanding('understand'),
+                          icon: const Icon(Icons.check_circle_outline_rounded,
+                              size: 18),
+                          label: const Text('Yes, I understand')),
+                      OutlinedButton.icon(
+                          onPressed: () => _markUnderstanding('more'),
+                          icon: const Icon(Icons.more_horiz_rounded, size: 18),
+                          label: const Text('Explain More')),
+                      OutlinedButton.icon(
+                          onPressed: () => _askTutor(
+                              preset:
+                                  'Explain this more simply using the exact numbers.'),
+                          icon: const Icon(Icons.menu_book_rounded, size: 18),
+                          label: const Text('Simpler')),
+                      OutlinedButton.icon(
+                          onPressed: () => _askTutor(
+                              preset:
+                                  'Give me another worked example and explain every step.'),
+                          icon: const Icon(Icons.lightbulb_outline_rounded,
+                              size: 18),
+                          label: const Text('Another Example')),
+                    ],
+                  ),
+                  if (_understandingStatus != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      _understandingStatus == 'understand'
+                          ? 'âœ… Great. Letâ€™s prove it with a short practice question.'
+                          : 'ðŸ’¡ No problem. I have added a deeper explanation. You can keep asking until it is clear.',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF2C4D78)),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            _ResultCard(
+              title: 'What do you not understand?',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                      'Write the exact part that is confusing you. For example: â€œWhy did 15 become 16?â€, â€œWhy do I need a common denominator?â€, or â€œWhy did we divide by 2?â€',
+                      style: TextStyle(color: Color(0xFF5E6D81), height: 1.45)),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _askController,
+                    minLines: 3,
+                    maxLines: 6,
+                    textInputAction: TextInputAction.newline,
+                    decoration: InputDecoration(
+                      hintText:
+                          'Tell TutorAI exactly what you do not understand...',
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFD),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFDDE6F2))),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                              color: Color(0xFF2563EB), width: 1.5)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      onPressed: _sending
+                          ? null
+                          : () => _askTutor(controller: _askController),
+                      icon: _sending
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2.3, color: Colors.white))
+                          : const Icon(Icons.auto_awesome_rounded),
+                      label: Text(_sending
+                          ? 'Explaining...'
+                          : "Explain What I Don't Understand"),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            _ResultCard(
+              title: 'Ask TutorAI',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                      'Ask anything about the lesson at any time. TutorAI will use the current question and lesson steps as context.',
+                      style: TextStyle(color: Color(0xFF5E6D81), height: 1.45)),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _conversationController,
+                    minLines: 2,
+                    maxLines: 4,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _sending
+                        ? null
+                        : _askTutor(controller: _conversationController),
+                    decoration: InputDecoration(
+                      hintText: 'Ask TutorAI a question...',
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFD),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFDDE6F2))),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                              color: Color(0xFF2563EB), width: 1.5)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      onPressed: _sending
+                          ? null
+                          : () =>
+                              _askTutor(controller: _conversationController),
+                      icon: _sending
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2.3, color: Colors.white))
+                          : const Icon(Icons.chat_bubble_outline_rounded),
+                      label: Text(_sending ? 'Thinking...' : 'Ask Tutor'),
+                    ),
+                  ),
+                  if (_tutorReplies.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    for (final reply in _tutorReplies)
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                            color: reply.startsWith('TutorAI:')
+                                ? const Color(0xFFEAF2FF)
+                                : const Color(0xFFF4F5F7),
+                            borderRadius: BorderRadius.circular(14)),
+                        child: Text(reply,
+                            style: const TextStyle(
+                                color: Color(0xFF32435D), height: 1.45)),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            _ResultCard(
+              title: 'Practice â€” show me you understand',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                      'Now solve a similar question yourself. TutorAI will mark the answer, explain mistakes, and let you ask for help again.',
+                      style: TextStyle(color: Color(0xFF5E6D81), height: 1.45)),
+                  const SizedBox(height: 10),
+                  Text(_practiceQuestionFor(solution),
+                      style: const TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF14213D))),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _practiceController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true, signed: true),
+                    decoration: InputDecoration(
+                      hintText: 'Your answer',
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFD),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFDDE6F2))),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                              color: Color(0xFF2563EB), width: 1.5)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                        onPressed: _checkPractice,
+                        icon: const Icon(Icons.check_rounded),
+                        label: const Text('Check My Answer')),
+                  ),
+                  if (_practiceChecked) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                          color: _practiceCorrect == true
+                              ? const Color(0xFFE1F8EA)
+                              : const Color(0xFFFFF1F1),
+                          borderRadius: BorderRadius.circular(14)),
+                      child: Text(_practiceFeedback,
+                          style: TextStyle(
+                              color: _practiceCorrect == true
+                                  ? const Color(0xFF1B6B49)
+                                  : const Color(0xFF9B3030),
+                              fontWeight: FontWeight.w700,
+                              height: 1.45)),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            _ResultCard(
+              title: 'One more example',
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(solution.example,
+                        style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF14213D))),
+                    const SizedBox(height: 8),
+                    const Text(
+                        'Try to explain to yourself why the method works before looking for help.',
+                        style:
+                            TextStyle(color: Color(0xFF5E6D81), height: 1.4)),
+                  ]),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Ask Another'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                              'Practice is ready below. Try it and check your answer.'),
+                        ),
+                      );
+                    },
+                    child: const Text('Practice Below â†’'),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -4661,8 +5465,19 @@ class _ResultCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(17),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: _softShadow()),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Color(0xFF14213D))), const SizedBox(height: 12), child]),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: _softShadow()),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title,
+            style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+                color: Color(0xFF14213D))),
+        const SizedBox(height: 12),
+        child
+      ]),
     );
   }
 }
@@ -4673,7 +5488,11 @@ class _Step extends StatelessWidget {
   final String body;
   final VoidCallback? onAsk;
 
-  const _Step({required this.number, required this.title, required this.body, this.onAsk});
+  const _Step(
+      {required this.number,
+      required this.title,
+      required this.body,
+      this.onAsk});
 
   @override
   Widget build(BuildContext context) {
@@ -4683,24 +5502,34 @@ class _Step extends StatelessWidget {
         Container(
           height: 30,
           width: 30,
-          decoration: const BoxDecoration(color: Color(0xFF2563EB), shape: BoxShape.circle),
-          child: Center(child: Text(number, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900))),
+          decoration: const BoxDecoration(
+              color: Color(0xFF2563EB), shape: BoxShape.circle),
+          child: Center(
+              child: Text(number,
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w900))),
         ),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF24334B))),
+              Text(title,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, color: Color(0xFF24334B))),
               const SizedBox(height: 6),
-              Text(body, style: const TextStyle(fontSize: 14, height: 1.5, color: Color(0xFF53637A))),
+              Text(body,
+                  style: const TextStyle(
+                      fontSize: 14, height: 1.5, color: Color(0xFF53637A))),
               if (onAsk != null) ...[
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: onAsk,
                   icon: const Icon(Icons.help_outline_rounded, size: 16),
                   label: const Text('Ask why'),
-                  style: OutlinedButton.styleFrom(minimumSize: const Size(0, 34), padding: const EdgeInsets.symmetric(horizontal: 10)),
+                  style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 34),
+                      padding: const EdgeInsets.symmetric(horizontal: 10)),
                 ),
               ],
             ],
@@ -4711,62 +5540,97 @@ class _Step extends StatelessWidget {
   }
 }
 
-
 String _keyIdeaForTopic(String topic) {
   final t = topic.toLowerCase();
-  if (t.contains('decimal')) return 'Keep matching place values together. Decimal points align the ones, tenths, hundredths, and smaller units so each digit keeps its correct value.';
-  if (t.contains('fraction')) return 'A fraction represents part of a whole. Always ask what the numerator counts, what the denominator means, and whether the fractional pieces are the same size.';
-  if (t.contains('percentage')) return 'A percentage is a number out of 100. Decide whether the question asks for a percentage of a whole, a percentage change, or a part-as-a-percent relationship.';
-  if (t.contains('ratio')) return 'A ratio compares quantities in the same relationship. A proportion means two ratios are equal, so cross multiplication can create an equation.';
-  if (t.contains('average')) return 'The mean shares the total equally. Add every value first, then divide by how many values there are.';
-  if (t.contains('algebra')) return 'Treat an equation like a balance. Whatever operation you apply to one side must also be applied to the other side.';
-  if (t.contains('order')) return 'Operations have a priority. Parentheses come first, then multiplication/division, then addition/subtraction.';
-  if (t.contains('addition')) return 'Combine matching place values from right to left and regroup whenever a column reaches 10 or more.';
-  if (t.contains('subtraction')) return 'Subtract matching place values from right to left and regroup from the next larger place when necessary.';
-  if (t.contains('multiplication')) return 'Multiplication combines equal groups and preserves place value through each partial product.';
-  if (t.contains('division')) return 'Division asks how many equal groups fit into the quantity. Use the inverse multiplication check at the end.';
+  if (t.contains('decimal'))
+    return 'Keep matching place values together. Decimal points align the ones, tenths, hundredths, and smaller units so each digit keeps its correct value.';
+  if (t.contains('fraction'))
+    return 'A fraction represents part of a whole. Always ask what the numerator counts, what the denominator means, and whether the fractional pieces are the same size.';
+  if (t.contains('percentage'))
+    return 'A percentage is a number out of 100. Decide whether the question asks for a percentage of a whole, a percentage change, or a part-as-a-percent relationship.';
+  if (t.contains('ratio'))
+    return 'A ratio compares quantities in the same relationship. A proportion means two ratios are equal, so cross multiplication can create an equation.';
+  if (t.contains('average'))
+    return 'The mean shares the total equally. Add every value first, then divide by how many values there are.';
+  if (t.contains('algebra'))
+    return 'Treat an equation like a balance. Whatever operation you apply to one side must also be applied to the other side.';
+  if (t.contains('order'))
+    return 'Operations have a priority. Parentheses come first, then multiplication/division, then addition/subtraction.';
+  if (t.contains('addition'))
+    return 'Combine matching place values from right to left and regroup whenever a column reaches 10 or more.';
+  if (t.contains('subtraction'))
+    return 'Subtract matching place values from right to left and regroup from the next larger place when necessary.';
+  if (t.contains('multiplication'))
+    return 'Multiplication combines equal groups and preserves place value through each partial product.';
+  if (t.contains('division'))
+    return 'Division asks how many equal groups fit into the quantity. Use the inverse multiplication check at the end.';
   return 'Focus on what the question is asking, identify the method, work one step at a time, and verify the answer.';
 }
 
 String _commonMistakeForTopic(String topic) {
   final t = topic.toLowerCase();
-  if (t.contains('decimal')) return 'Do not shift a decimal point casually. Line up place values or move both decimal points by the same number of places when the method requires it.';
-  if (t.contains('fraction')) return 'Do not add or subtract denominators directly. For addition and subtraction, the fractional pieces must represent the same-sized parts.';
-  if (t.contains('percentage')) return 'Do not confuse the whole, the part, and the percentage. Identify which quantity is the reference whole before calculating.';
-  if (t.contains('ratio')) return 'Do not mix the order of the ratio terms. Keep the first quantity matched with the first quantity and the second with the second.';
-  if (t.contains('average')) return 'Do not divide too early. Add every value first, then divide by the number of values.';
-  if (t.contains('algebra')) return 'Do not move a term across the equals sign without accounting for the operation. Keep the equation balanced.';
-  if (t.contains('order')) return 'Do not simply calculate from left to right when multiplication, division, or parentheses are present.';
+  if (t.contains('decimal'))
+    return 'Do not shift a decimal point casually. Line up place values or move both decimal points by the same number of places when the method requires it.';
+  if (t.contains('fraction'))
+    return 'Do not add or subtract denominators directly. For addition and subtraction, the fractional pieces must represent the same-sized parts.';
+  if (t.contains('percentage'))
+    return 'Do not confuse the whole, the part, and the percentage. Identify which quantity is the reference whole before calculating.';
+  if (t.contains('ratio'))
+    return 'Do not mix the order of the ratio terms. Keep the first quantity matched with the first quantity and the second with the second.';
+  if (t.contains('average'))
+    return 'Do not divide too early. Add every value first, then divide by the number of values.';
+  if (t.contains('algebra'))
+    return 'Do not move a term across the equals sign without accounting for the operation. Keep the equation balanced.';
+  if (t.contains('order'))
+    return 'Do not simply calculate from left to right when multiplication, division, or parentheses are present.';
   return 'Write each step clearly and check the result using an inverse operation or a quick estimate.';
 }
 
-
 String _learningObjectiveForTopic(String topic) {
   final t = topic.toLowerCase();
-  if (t.contains('decimal')) return 'By the end, you should be able to identify each decimal place, align matching places, regroup correctly, and explain why the decimal point stays in the same column.';
-  if (t.contains('fraction')) return 'By the end, you should be able to describe the numerator and denominator, choose the correct operation rule, simplify the result, and explain why the rule works.';
-  if (t.contains('percentage')) return 'By the end, you should be able to identify the whole, the part, and the percentage relationship before choosing a calculation.';
-  if (t.contains('ratio')) return 'By the end, you should be able to preserve matching ratio positions, create an equivalent ratio, and solve for an unknown reliably.';
-  if (t.contains('average')) return 'By the end, you should be able to calculate a mean and explain why dividing the total by the number of values gives the equal share.';
-  if (t.contains('algebra')) return 'By the end, you should be able to preserve balance, isolate the variable systematically, and verify the solution in the original equation.';
-  if (t.contains('geometry')) return 'By the end, you should be able to choose the correct formula, substitute measurements with units, and distinguish area from perimeter.';
-  if (t.contains('conversion')) return 'By the end, you should be able to choose a common unit, convert in the correct direction, and check whether the final number should be larger or smaller.';
-  if (t.contains('exponent')) return 'By the end, you should be able to interpret an exponent as repeated multiplication and connect powers with their size.';
-  if (t.contains('square root')) return 'By the end, you should be able to interpret a square root as the inverse of squaring and verify the answer by squaring it.';
-  if (t.contains('order')) return 'By the end, you should be able to identify the operation priority and explain why changing the order can change the result.';
+  if (t.contains('decimal'))
+    return 'By the end, you should be able to identify each decimal place, align matching places, regroup correctly, and explain why the decimal point stays in the same column.';
+  if (t.contains('fraction'))
+    return 'By the end, you should be able to describe the numerator and denominator, choose the correct operation rule, simplify the result, and explain why the rule works.';
+  if (t.contains('percentage'))
+    return 'By the end, you should be able to identify the whole, the part, and the percentage relationship before choosing a calculation.';
+  if (t.contains('ratio'))
+    return 'By the end, you should be able to preserve matching ratio positions, create an equivalent ratio, and solve for an unknown reliably.';
+  if (t.contains('average'))
+    return 'By the end, you should be able to calculate a mean and explain why dividing the total by the number of values gives the equal share.';
+  if (t.contains('algebra'))
+    return 'By the end, you should be able to preserve balance, isolate the variable systematically, and verify the solution in the original equation.';
+  if (t.contains('geometry'))
+    return 'By the end, you should be able to choose the correct formula, substitute measurements with units, and distinguish area from perimeter.';
+  if (t.contains('conversion'))
+    return 'By the end, you should be able to choose a common unit, convert in the correct direction, and check whether the final number should be larger or smaller.';
+  if (t.contains('exponent'))
+    return 'By the end, you should be able to interpret an exponent as repeated multiplication and connect powers with their size.';
+  if (t.contains('square root'))
+    return 'By the end, you should be able to interpret a square root as the inverse of squaring and verify the answer by squaring it.';
+  if (t.contains('order'))
+    return 'By the end, you should be able to identify the operation priority and explain why changing the order can change the result.';
   return 'By the end, you should be able to explain the method, perform each step accurately, and verify the answer independently.';
 }
 
 String _masteryCheckForTopic(String topic) {
   final t = topic.toLowerCase();
-  if (t.contains('decimal')) return 'Can you solve a new decimal question without looking at the worked example, then explain where any carry or regrouping came from?';
-  if (t.contains('fraction')) return 'Can you explain why the denominators must match for addition/subtraction, or why the reciprocal appears in division?';
-  if (t.contains('percentage')) return 'Can you identify which number is the whole, which is the part, and why the percentage is divided by 100?';
-  if (t.contains('ratio')) return 'Can you explain why the same multiplier must be applied to both sides of the ratio?';
-  if (t.contains('average')) return 'Can you explain why we divide the total by the number of data values rather than by one of the values?';
-  if (t.contains('algebra')) return 'Can you explain why the same operation must be applied to both sides before isolating x?';
-  if (t.contains('geometry')) return 'Can you choose the correct formula yourself and state the correct unit for the answer?';
-  if (t.contains('order')) return 'Can you say which operation you would perform first and why, before calculating the answer?';
+  if (t.contains('decimal'))
+    return 'Can you solve a new decimal question without looking at the worked example, then explain where any carry or regrouping came from?';
+  if (t.contains('fraction'))
+    return 'Can you explain why the denominators must match for addition/subtraction, or why the reciprocal appears in division?';
+  if (t.contains('percentage'))
+    return 'Can you identify which number is the whole, which is the part, and why the percentage is divided by 100?';
+  if (t.contains('ratio'))
+    return 'Can you explain why the same multiplier must be applied to both sides of the ratio?';
+  if (t.contains('average'))
+    return 'Can you explain why we divide the total by the number of data values rather than by one of the values?';
+  if (t.contains('algebra'))
+    return 'Can you explain why the same operation must be applied to both sides before isolating x?';
+  if (t.contains('geometry'))
+    return 'Can you choose the correct formula yourself and state the correct unit for the answer?';
+  if (t.contains('order'))
+    return 'Can you say which operation you would perform first and why, before calculating the answer?';
   return 'Can you solve a similar question without help and explain why each step is valid?';
 }
 
@@ -4799,13 +5663,28 @@ class _LearnSubjectData {
 }
 
 class LearnScreen extends StatefulWidget {
-  const LearnScreen({super.key});
+  final String? initialSubject;
+
+  const LearnScreen({
+    super.key,
+    this.initialSubject,
+  });
 
   @override
   State<LearnScreen> createState() => _LearnScreenState();
 }
 
 class _LearnScreenState extends State<LearnScreen> {
+  @override
+  void initState() {
+    super.initState();
+
+    final initial = widget.initialSubject;
+    if (initial != null && _subjects.any((item) => item.name == initial)) {
+      _selectedSubject = initial;
+    }
+  }
+
   static const List<_LearnSubjectData> _subjects = <_LearnSubjectData>[
     _LearnSubjectData(
       name: 'Mathematics',
@@ -4854,7 +5733,8 @@ class _LearnScreenState extends State<LearnScreen> {
         _LearnTopicData(
           title: 'States of Matter',
           subtitle: 'Solids, liquids and gases',
-          prompt: 'Explain the three common states of matter with simple examples.',
+          prompt:
+              'Explain the three common states of matter with simple examples.',
         ),
         _LearnTopicData(
           title: 'Energy',
@@ -4877,17 +5757,20 @@ class _LearnScreenState extends State<LearnScreen> {
         _LearnTopicData(
           title: 'Tenses',
           subtitle: 'Present, past and future',
-          prompt: 'Explain present, past, and future tense with simple examples.',
+          prompt:
+              'Explain present, past, and future tense with simple examples.',
         ),
         _LearnTopicData(
           title: 'Vocabulary',
           subtitle: 'Build stronger word knowledge',
-          prompt: 'What does the word rapid mean? Give simple examples and a few similar words.',
+          prompt:
+              'What does the word rapid mean? Give simple examples and a few similar words.',
         ),
         _LearnTopicData(
           title: 'Comprehension',
           subtitle: 'Find the main idea',
-          prompt: 'Teach me how to find the main idea in a comprehension passage.',
+          prompt:
+              'Teach me how to find the main idea in a comprehension passage.',
         ),
       ],
     ),
@@ -4900,12 +5783,14 @@ class _LearnScreenState extends State<LearnScreen> {
         _LearnTopicData(
           title: 'African History',
           subtitle: 'Learn events in context',
-          prompt: 'Teach me an introduction to African history in simple school-level language.',
+          prompt:
+              'Teach me an introduction to African history in simple school-level language.',
         ),
         _LearnTopicData(
           title: 'Important Events',
           subtitle: 'Understand cause and effect',
-          prompt: 'Explain how historians use cause and effect to understand important events.',
+          prompt:
+              'Explain how historians use cause and effect to understand important events.',
         ),
       ],
     ),
@@ -4941,7 +5826,8 @@ class _LearnScreenState extends State<LearnScreen> {
         _LearnTopicData(
           title: 'Exam Preparation',
           subtitle: 'Plan revision step by step',
-          prompt: 'Teach me how to prepare for an important school exam using a simple study plan.',
+          prompt:
+              'Teach me how to prepare for an important school exam using a simple study plan.',
         ),
       ],
     ),
@@ -5082,9 +5968,8 @@ class _LearnScreenState extends State<LearnScreen> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: selected
-                              ? item.color
-                              : const Color(0xFFE1E8F4),
+                          color:
+                              selected ? item.color : const Color(0xFFE1E8F4),
                           width: selected ? 1.7 : 1,
                         ),
                         boxShadow: const [
@@ -5321,7 +6206,8 @@ class _PracticeScreenState extends State<PracticeScreen> {
     'General Schoolwork',
   ];
 
-  static const Map<String, List<_PracticeQuestion>> _questionBank = <String, List<_PracticeQuestion>>{
+  static const Map<String, List<_PracticeQuestion>> _questionBank =
+      <String, List<_PracticeQuestion>>{
     'Mathematics': <_PracticeQuestion>[
       _PracticeQuestion(
         subject: 'Mathematics',
@@ -5329,7 +6215,8 @@ class _PracticeScreenState extends State<PracticeScreen> {
         question: 'Solve: 2x + 6 = 14',
         options: null,
         answer: '4',
-        explanation: 'Subtract 6 from both sides to get 2x = 8, then divide both sides by 2. Therefore x = 4.',
+        explanation:
+            'Subtract 6 from both sides to get 2x = 8, then divide both sides by 2. Therefore x = 4.',
       ),
       _PracticeQuestion(
         subject: 'Mathematics',
@@ -5345,7 +6232,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
         question: 'What is 20% of 150?',
         options: <String>['20', '25', '30', '35'],
         answer: '30',
-        explanation: '20% means 20 ÷ 100. So 20/100 × 150 = 30.',
+        explanation: '20% means 20 Ã· 100. So 20/100 Ã— 150 = 30.',
       ),
       _PracticeQuestion(
         subject: 'Mathematics',
@@ -5353,15 +6240,17 @@ class _PracticeScreenState extends State<PracticeScreen> {
         question: 'Calculate: 4.50 + 2.25',
         options: null,
         answer: '6.75',
-        explanation: 'Align the decimal points and add the hundredths, tenths, and whole-number columns. The result is 6.75.',
+        explanation:
+            'Align the decimal points and add the hundredths, tenths, and whole-number columns. The result is 6.75.',
       ),
       _PracticeQuestion(
         subject: 'Mathematics',
         topic: 'Order of Operations',
-        question: 'Calculate: 6 + 4 × 2',
+        question: 'Calculate: 6 + 4 Ã— 2',
         options: <String>['14', '20', '16', '12'],
         answer: '14',
-        explanation: 'Multiplication comes before addition, so 4 × 2 = 8, then 6 + 8 = 14.',
+        explanation:
+            'Multiplication comes before addition, so 4 Ã— 2 = 8, then 6 + 8 = 14.',
       ),
     ],
     'Science': <_PracticeQuestion>[
@@ -5371,15 +6260,22 @@ class _PracticeScreenState extends State<PracticeScreen> {
         question: 'Which organ pumps blood around the human body?',
         options: <String>['Lungs', 'Heart', 'Kidney', 'Stomach'],
         answer: 'Heart',
-        explanation: 'The heart is a muscular organ that pumps blood through the circulatory system.',
+        explanation:
+            'The heart is a muscular organ that pumps blood through the circulatory system.',
       ),
       _PracticeQuestion(
         subject: 'Science',
         topic: 'Biology',
         question: 'What process do green plants use to make food using light?',
-        options: <String>['Respiration', 'Digestion', 'Photosynthesis', 'Filtration'],
+        options: <String>[
+          'Respiration',
+          'Digestion',
+          'Photosynthesis',
+          'Filtration'
+        ],
         answer: 'Photosynthesis',
-        explanation: 'Photosynthesis uses light energy to help plants make glucose from carbon dioxide and water.',
+        explanation:
+            'Photosynthesis uses light energy to help plants make glucose from carbon dioxide and water.',
       ),
       _PracticeQuestion(
         subject: 'Science',
@@ -5401,9 +6297,15 @@ class _PracticeScreenState extends State<PracticeScreen> {
         subject: 'Science',
         topic: 'Physics',
         question: 'Which form of energy is associated with moving objects?',
-        options: <String>['Kinetic energy', 'Chemical energy', 'Nuclear energy', 'Sound energy'],
+        options: <String>[
+          'Kinetic energy',
+          'Chemical energy',
+          'Nuclear energy',
+          'Sound energy'
+        ],
         answer: 'Kinetic energy',
-        explanation: 'Kinetic energy is the energy an object has because of its motion.',
+        explanation:
+            'Kinetic energy is the energy an object has because of its motion.',
       ),
     ],
     'English': <_PracticeQuestion>[
@@ -5411,41 +6313,56 @@ class _PracticeScreenState extends State<PracticeScreen> {
         subject: 'English',
         topic: 'Grammar',
         question: 'Choose the correct sentence.',
-        options: <String>['She go to school every day.', 'She goes to school every day.', 'She going to school every day.', 'She gone to school every day.'],
+        options: <String>[
+          'She go to school every day.',
+          'She goes to school every day.',
+          'She going to school every day.',
+          'She gone to school every day.'
+        ],
         answer: 'She goes to school every day.',
-        explanation: 'With the singular subject “She” in the simple present tense, the verb takes -s: “goes.”',
+        explanation:
+            'With the singular subject â€œSheâ€ in the simple present tense, the verb takes -s: â€œgoes.â€',
       ),
       _PracticeQuestion(
         subject: 'English',
         topic: 'Vocabulary',
-        question: 'What is the closest meaning of “rapid”?',
+        question: 'What is the closest meaning of â€œrapidâ€?',
         options: <String>['Slow', 'Quick', 'Quiet', 'Heavy'],
         answer: 'Quick',
-        explanation: '“Rapid” means happening or moving quickly.',
+        explanation: 'â€œRapidâ€ means happening or moving quickly.',
       ),
       _PracticeQuestion(
         subject: 'English',
         topic: 'Parts of Speech',
-        question: 'In “The bright student smiled,” which word is the adjective?',
+        question:
+            'In â€œThe bright student smiled,â€ which word is the adjective?',
         options: <String>['The', 'bright', 'student', 'smiled'],
         answer: 'bright',
-        explanation: '“Bright” describes the noun “student,” so it is the adjective.',
+        explanation:
+            'â€œBrightâ€ describes the noun â€œstudent,â€ so it is the adjective.',
       ),
       _PracticeQuestion(
         subject: 'English',
         topic: 'Grammar',
-        question: 'Choose the correct past tense of “write.”',
+        question: 'Choose the correct past tense of â€œwrite.â€',
         options: <String>['Writed', 'Written', 'Wrote', 'Writing'],
         answer: 'Wrote',
-        explanation: 'The simple past tense of “write” is “wrote.” “Written” is the past participle.',
+        explanation:
+            'The simple past tense of â€œwriteâ€ is â€œwrote.â€ â€œWrittenâ€ is the past participle.',
       ),
       _PracticeQuestion(
         subject: 'English',
         topic: 'Comprehension',
         question: 'A main idea is best described as:',
-        options: <String>['A small detail', 'The central point', 'A difficult word', 'The final punctuation mark'],
+        options: <String>[
+          'A small detail',
+          'The central point',
+          'A difficult word',
+          'The final punctuation mark'
+        ],
         answer: 'The central point',
-        explanation: 'The main idea is the central message or most important point of a passage.',
+        explanation:
+            'The main idea is the central message or most important point of a passage.',
       ),
     ],
     'General Schoolwork': <_PracticeQuestion>[
@@ -5455,7 +6372,8 @@ class _PracticeScreenState extends State<PracticeScreen> {
         question: 'Which planet is known as the Red Planet?',
         options: <String>['Venus', 'Mars', 'Jupiter', 'Mercury'],
         answer: 'Mars',
-        explanation: 'Mars is called the Red Planet because iron minerals on its surface create a reddish appearance.',
+        explanation:
+            'Mars is called the Red Planet because iron minerals on its surface create a reddish appearance.',
       ),
       _PracticeQuestion(
         subject: 'General Schoolwork',
@@ -5463,31 +6381,50 @@ class _PracticeScreenState extends State<PracticeScreen> {
         question: 'How many days are there in a leap year?',
         options: <String>['364', '365', '366', '367'],
         answer: '366',
-        explanation: 'A leap year has one extra day in February, giving a total of 366 days.',
+        explanation:
+            'A leap year has one extra day in February, giving a total of 366 days.',
       ),
       _PracticeQuestion(
         subject: 'General Schoolwork',
         topic: 'Study Skills',
         question: 'Which action best helps you remember a new concept?',
-        options: <String>['Avoiding practice', 'Active recall', 'Only rereading once', 'Skipping difficult parts'],
+        options: <String>[
+          'Avoiding practice',
+          'Active recall',
+          'Only rereading once',
+          'Skipping difficult parts'
+        ],
         answer: 'Active recall',
-        explanation: 'Active recall strengthens learning by making you retrieve information from memory instead of only rereading it.',
+        explanation:
+            'Active recall strengthens learning by making you retrieve information from memory instead of only rereading it.',
       ),
       _PracticeQuestion(
         subject: 'General Schoolwork',
         topic: 'Civics',
         question: 'What is a constitution?',
-        options: <String>['A school timetable', 'A set of fundamental laws and principles', 'A weather report', 'A shopping list'],
+        options: <String>[
+          'A school timetable',
+          'A set of fundamental laws and principles',
+          'A weather report',
+          'A shopping list'
+        ],
         answer: 'A set of fundamental laws and principles',
-        explanation: 'A constitution sets out fundamental rules, institutions, rights, and principles for a state.',
+        explanation:
+            'A constitution sets out fundamental rules, institutions, rights, and principles for a state.',
       ),
       _PracticeQuestion(
         subject: 'General Schoolwork',
         topic: 'Study Skills',
         question: 'What should you do first when a question is unclear?',
-        options: <String>['Guess immediately', 'Ignore it', 'Identify exactly what is being asked', 'Copy another answer'],
+        options: <String>[
+          'Guess immediately',
+          'Ignore it',
+          'Identify exactly what is being asked',
+          'Copy another answer'
+        ],
         answer: 'Identify exactly what is being asked',
-        explanation: 'Understanding the task first helps you choose the right method and avoid solving the wrong problem.',
+        explanation:
+            'Understanding the task first helps you choose the right method and avoid solving the wrong problem.',
       ),
     ],
   };
@@ -5520,8 +6457,20 @@ class _PracticeScreenState extends State<PracticeScreen> {
   }
 
   bool _answersMatch(String entered, String expected) {
-    final cleanEntered = entered.trim().replaceAll('×', '*').replaceAll('÷', '/').replaceAll(',', '').replaceAll(' ', '').toLowerCase();
-    final cleanExpected = expected.trim().replaceAll('×', '*').replaceAll('÷', '/').replaceAll(',', '').replaceAll(' ', '').toLowerCase();
+    final cleanEntered = entered
+        .trim()
+        .replaceAll('Ã—', '*')
+        .replaceAll('Ã·', '/')
+        .replaceAll(',', '')
+        .replaceAll(' ', '')
+        .toLowerCase();
+    final cleanExpected = expected
+        .trim()
+        .replaceAll('Ã—', '*')
+        .replaceAll('Ã·', '/')
+        .replaceAll(',', '')
+        .replaceAll(' ', '')
+        .toLowerCase();
     if (cleanEntered == cleanExpected) return true;
 
     final enteredFraction = _parseFraction(cleanEntered);
@@ -5544,7 +6493,8 @@ class _PracticeScreenState extends State<PracticeScreen> {
     if (match == null) return null;
     final numerator = int.tryParse(match.group(1)!);
     final denominator = int.tryParse(match.group(2)!);
-    if (numerator == null || denominator == null || denominator == 0) return null;
+    if (numerator == null || denominator == null || denominator == 0)
+      return null;
     return _SimpleFraction(numerator, denominator).normalized();
   }
 
@@ -5623,7 +6573,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
     required bool correct,
   }) {
     if (correct) {
-      return '✅ Correct!\n\n'
+      return 'âœ… Correct!\n\n'
           'Why your answer is correct:\n'
           '${question.explanation}\n\n'
           'Key idea:\n'
@@ -5632,7 +6582,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
           'Before moving on, explain the key idea in your own words. That helps turn the answer into understanding.';
     }
 
-    return '📘 Let’s learn from it.\n\n'
+    return 'ðŸ“˜ Letâ€™s learn from it.\n\n'
         'Your answer:\n'
         '$entered\n\n'
         'Correct answer:\n'
@@ -5723,23 +6673,35 @@ class _PracticeScreenState extends State<PracticeScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFFE8F0FF), Color(0xFFF2ECFF)]),
+                gradient: const LinearGradient(
+                    colors: [Color(0xFFE8F0FF), Color(0xFFF2ECFF)]),
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: _softShadow(),
               ),
               child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.auto_awesome_rounded, color: Color(0xFF2563EB), size: 28),
+                  Icon(Icons.auto_awesome_rounded,
+                      color: Color(0xFF2563EB), size: 28),
                   SizedBox(height: 10),
-                  Text('Show what you understand', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF14213D))),
+                  Text('Show what you understand',
+                      style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF14213D))),
                   SizedBox(height: 8),
-                  Text('Choose a subject and complete 5 questions. Check each answer before moving to the next one.', style: TextStyle(color: Color(0xFF52637A), height: 1.5)),
+                  Text(
+                      'Choose a subject and complete 5 questions. Check each answer before moving to the next one.',
+                      style: TextStyle(color: Color(0xFF52637A), height: 1.5)),
                 ],
               ),
             ),
             const SizedBox(height: 20),
-            const Text('Choose a subject', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF14213D))),
+            const Text('Choose a subject',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF14213D))),
             const SizedBox(height: 10),
             for (final subject in _subjects) ...[
               _practiceSubjectCard(subject),
@@ -5780,21 +6742,29 @@ class _PracticeScreenState extends State<PracticeScreen> {
             Container(
               height: 50,
               width: 50,
-              decoration: BoxDecoration(color: colors[subject], shape: BoxShape.circle),
-              child: Icon(icons[subject], color: const Color(0xFF2563EB), size: 25),
+              decoration:
+                  BoxDecoration(color: colors[subject], shape: BoxShape.circle),
+              child: Icon(icons[subject],
+                  color: const Color(0xFF2563EB), size: 25),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(subject, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF14213D))),
+                  Text(subject,
+                      style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF14213D))),
                   const SizedBox(height: 4),
-                  const Text('5 questions • instant marking', style: TextStyle(color: Color(0xFF66758A), fontSize: 13)),
+                  const Text('5 questions â€¢ instant marking',
+                      style: TextStyle(color: Color(0xFF66758A), fontSize: 13)),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFF7B8BA1)),
+            const Icon(Icons.arrow_forward_ios_rounded,
+                size: 16, color: Color(0xFF7B8BA1)),
           ],
         ),
       ),
@@ -5826,9 +6796,16 @@ class _PracticeScreenState extends State<PracticeScreen> {
             Row(
               children: [
                 Expanded(
-                  child: Text('Question ${_questionIndex + 1} of ${_questions.length}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF14213D))),
+                  child: Text(
+                      'Question ${_questionIndex + 1} of ${_questions.length}',
+                      style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF14213D))),
                 ),
-                Text('${_score} correct', style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF2B775D))),
+                Text('${_score} correct',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, color: Color(0xFF2B775D))),
               ],
             ),
             const SizedBox(height: 10),
@@ -5844,17 +6821,32 @@ class _PracticeScreenState extends State<PracticeScreen> {
             const SizedBox(height: 18),
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: _softShadow()),
+              decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: _softShadow()),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(color: const Color(0xFFE7F0FF), borderRadius: BorderRadius.circular(20)),
-                    child: Text(question.topic, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF2759A8))),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                        color: const Color(0xFFE7F0FF),
+                        borderRadius: BorderRadius.circular(20)),
+                    child: Text(question.topic,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF2759A8))),
                   ),
                   const SizedBox(height: 16),
-                  Text(question.question, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF14213D), height: 1.35)),
+                  Text(question.question,
+                      style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF14213D),
+                          height: 1.35)),
                   const SizedBox(height: 18),
                   if (question.options != null)
                     for (final option in question.options!) ...[
@@ -5870,9 +6862,17 @@ class _PracticeScreenState extends State<PracticeScreen> {
                         hintText: 'Type your answer',
                         filled: true,
                         fillColor: const Color(0xFFF8FAFD),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFDDE6F2))),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFDDE6F2))),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(
+                                color: Color(0xFF2563EB), width: 1.5)),
                       ),
                     ),
                 ],
@@ -5907,13 +6907,27 @@ class _PracticeScreenState extends State<PracticeScreen> {
         decoration: BoxDecoration(
           color: selected ? const Color(0xFFEAF2FF) : const Color(0xFFF8FAFD),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: selected ? const Color(0xFF2563EB) : const Color(0xFFDDE6F2), width: selected ? 1.6 : 1),
+          border: Border.all(
+              color:
+                  selected ? const Color(0xFF2563EB) : const Color(0xFFDDE6F2),
+              width: selected ? 1.6 : 1),
         ),
         child: Row(
           children: [
-            Icon(selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: selected ? const Color(0xFF2563EB) : const Color(0xFF7C8EA6)),
+            Icon(
+                selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_off_rounded,
+                color: selected
+                    ? const Color(0xFF2563EB)
+                    : const Color(0xFF7C8EA6)),
             const SizedBox(width: 12),
-            Expanded(child: Text(option, style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF24334B), height: 1.35))),
+            Expanded(
+                child: Text(option,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF24334B),
+                        height: 1.35))),
           ],
         ),
       ),
@@ -5921,31 +6935,45 @@ class _PracticeScreenState extends State<PracticeScreen> {
   }
 
   Widget _buildFeedback(_PracticeQuestion question) {
-    final background = _correct ? const Color(0xFFE1F8EA) : const Color(0xFFFFF1F1);
-    final foreground = _correct ? const Color(0xFF1B6B49) : const Color(0xFF9B3030);
+    final background =
+        _correct ? const Color(0xFFE1F8EA) : const Color(0xFFFFF1F1);
+    final foreground =
+        _correct ? const Color(0xFF1B6B49) : const Color(0xFF9B3030);
     return Container(
       padding: const EdgeInsets.all(17),
-      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+          color: background, borderRadius: BorderRadius.circular(20)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(_correct ? Icons.check_circle_rounded : Icons.info_rounded, color: foreground),
+              Icon(_correct ? Icons.check_circle_rounded : Icons.info_rounded,
+                  color: foreground),
               const SizedBox(width: 9),
-              Text(_correct ? 'Correct' : 'Let’s learn from it', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: foreground)),
+              Text(_correct ? 'Correct' : 'Letâ€™s learn from it',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: foreground)),
             ],
           ),
           const SizedBox(height: 10),
-          Text(_feedback, style: TextStyle(color: foreground, height: 1.5, fontWeight: FontWeight.w700)),
+          Text(_feedback,
+              style: TextStyle(
+                  color: foreground, height: 1.5, fontWeight: FontWeight.w700)),
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
             height: 48,
             child: ElevatedButton.icon(
               onPressed: _nextQuestion,
-              icon: Icon(_questionIndex == _questions.length - 1 ? Icons.emoji_events_rounded : Icons.arrow_forward_rounded),
-              label: Text(_questionIndex == _questions.length - 1 ? 'See My Score' : 'Next Question'),
+              icon: Icon(_questionIndex == _questions.length - 1
+                  ? Icons.emoji_events_rounded
+                  : Icons.arrow_forward_rounded),
+              label: Text(_questionIndex == _questions.length - 1
+                  ? 'See My Score'
+                  : 'Next Question'),
             ),
           ),
         ],
@@ -5958,7 +6986,10 @@ class _PracticeScreenState extends State<PracticeScreen> {
     final percent = total == 0 ? 0 : ((_score / total) * 100).round();
     return Scaffold(
       backgroundColor: const Color(0xFFF5F9FF),
-      appBar: AppBar(title: const Text('Practice Complete'), centerTitle: true, backgroundColor: Colors.transparent),
+      appBar: AppBar(
+          title: const Text('Practice Complete'),
+          centerTitle: true,
+          backgroundColor: Colors.transparent),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 12, 18, 30),
@@ -5966,39 +6997,64 @@ class _PracticeScreenState extends State<PracticeScreen> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFFE7F0FF), Color(0xFFF1E8FF)]),
+                gradient: const LinearGradient(
+                    colors: [Color(0xFFE7F0FF), Color(0xFFF1E8FF)]),
                 borderRadius: BorderRadius.circular(26),
                 boxShadow: _softShadow(),
               ),
               child: Column(
                 children: [
-                  const Icon(Icons.emoji_events_rounded, size: 58, color: Color(0xFF2563EB)),
+                  const Icon(Icons.emoji_events_rounded,
+                      size: 58, color: Color(0xFF2563EB)),
                   const SizedBox(height: 12),
-                  const Text('Practice complete!', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Color(0xFF14213D))),
+                  const Text('Practice complete!',
+                      style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF14213D))),
                   const SizedBox(height: 8),
-                  Text('$_score / $total correct', style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: Color(0xFF2563EB))),
+                  Text('$_score / $total correct',
+                      style: const TextStyle(
+                          fontSize: 30,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF2563EB))),
                   const SizedBox(height: 5),
-                  Text('$percent% • ${_selectedSubject ?? 'Practice'}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF52637A))),
+                  Text('$percent% â€¢ ${_selectedSubject ?? 'Practice'}',
+                      style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF52637A))),
                 ],
               ),
             ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: _softShadow()),
-              child: const Text('Use your score as a checkpoint, not a label. Review the questions you missed and try them again until the method feels clear.', style: TextStyle(color: Color(0xFF52637A), height: 1.5)),
+              decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: _softShadow()),
+              child: const Text(
+                  'Use your score as a checkpoint, not a label. Review the questions you missed and try them again until the method feels clear.',
+                  style: TextStyle(color: Color(0xFF52637A), height: 1.5)),
             ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               height: 52,
-              child: ElevatedButton.icon(onPressed: _restartPractice, icon: const Icon(Icons.refresh_rounded), label: const Text('Try Again')),
+              child: ElevatedButton.icon(
+                  onPressed: _restartPractice,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Try Again')),
             ),
             const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
               height: 52,
-              child: OutlinedButton.icon(onPressed: _resetToSubjects, icon: const Icon(Icons.swap_horiz_rounded), label: const Text('Choose Another Subject')),
+              child: OutlinedButton.icon(
+                  onPressed: _resetToSubjects,
+                  icon: const Icon(Icons.swap_horiz_rounded),
+                  label: const Text('Choose Another Subject')),
             ),
           ],
         ),
@@ -6006,7 +7062,6 @@ class _PracticeScreenState extends State<PracticeScreen> {
     );
   }
 }
-
 
 class AchievementsScreen extends StatelessWidget {
   const AchievementsScreen({super.key});
@@ -6358,6 +7413,60 @@ class _AchievementBadgeCard extends StatelessWidget {
 class ProgressScreen extends StatelessWidget {
   const ProgressScreen({super.key});
 
+  String _dateLabel(DateTime date) {
+    const months = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+
+    final hour = date.hour == 0
+        ? 12
+        : date.hour > 12
+            ? date.hour - 12
+            : date.hour;
+
+    final minute = date.minute.toString().padLeft(2, '0');
+    final period = date.hour >= 12 ? 'PM' : 'AM';
+
+    return '${months[date.month - 1]} ${date.day}, $hour:$minute $period';
+  }
+
+  IconData _subjectIcon(String subject) {
+    switch (subject.trim().toLowerCase()) {
+      case 'mathematics':
+        return Icons.calculate_rounded;
+      case 'science':
+        return Icons.science_rounded;
+      case 'english':
+        return Icons.menu_book_rounded;
+      default:
+        return Icons.school_rounded;
+    }
+  }
+
+  Color _subjectColor(String subject) {
+    switch (subject.trim().toLowerCase()) {
+      case 'mathematics':
+        return const Color(0xFF5B6FE8);
+      case 'science':
+        return const Color(0xFF18A875);
+      case 'english':
+        return const Color(0xFFE05274);
+      default:
+        return const Color(0xFF7A57C8);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -6369,154 +7478,224 @@ class ProgressScreen extends StatelessWidget {
         final accuracy = tutorProgress.accuracy;
         final practiceSessions = tutorProgress.practiceSessions;
         final subjectGroups = tutorProgress.sessionsBySubject;
-
-        final recentSessions = tutorProgress.sessions.reversed.take(5).toList();
+        final recentSessions =
+            tutorProgress.sessions.reversed.take(5).toList();
 
         return Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFFF3F8FF),
-                Color(0xFFFBFDFF),
-              ],
-            ),
-          ),
+          color: const Color(0xFFF5F9FF),
           child: SafeArea(
             bottom: false,
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 24),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 96),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Expanded(
+                      Container(
+                        width: 54,
+                        height: 54,
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFE9C4),
+                          borderRadius: BorderRadius.circular(17),
+                        ),
+                        child: Image.asset(
+                          'assets/tutorai_icons/my_progress.png',
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Your Progress',
+                            Text(
+                              'My Progress',
                               style: TextStyle(
-                                fontSize: 26,
+                                fontSize: 27,
                                 fontWeight: FontWeight.w900,
+                                color: Color(0xFF14213D),
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            SizedBox(height: 3),
                             Text(
-                              'See how your practice is improving.',
+                              'Your learning journey at a glance.',
                               style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade600,
+                                fontSize: 13,
+                                color: Color(0xFF52637A),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE2EEFF),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Icon(
-                          Icons.insights_rounded,
-                          color: Color(0xFF246BFD),
-                          size: 26,
-                        ),
-                      ),
                     ],
                   ),
-                  const SizedBox(height: 16),
 
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
+                  const SizedBox(height: 18),
+
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [
+                          Color(0xFFE8F0FF),
+                          Color(0xFFF1E9FF),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: Colors.white,
+                        width: 1.2,
+                      ),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x1822446B),
+                          blurRadius: 14,
+                          offset: Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 82,
+                          height: 82,
+                          padding: const EdgeInsets.all(11),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(22),
+                          ),
+                          child: Image.asset(
+                            'assets/tutorai_icons/my_progress.png',
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.high,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Overall Accuracy',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF52637A),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '$accuracy%',
+                                style: const TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF14213D),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                totalQuestions == 0
+                                    ? 'Start practicing to build your progress.'
+                                    : '$totalCorrect correct out of $totalQuestions questions',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF52637A),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 9),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: LinearProgressIndicator(
+                                  value: accuracy / 100,
+                                  minHeight: 8,
+                                  backgroundColor: Colors.white,
+                                  valueColor:
+                                      const AlwaysStoppedAnimation<Color>(
+                                    Color(0xFF246BFD),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  Row(
                     children: [
-                      _ProgressStatCard(
-                        title: 'Questions',
-                        value: '$totalQuestions',
-                        icon: Icons.quiz_rounded,
-                        background: const Color(0xFFE2EEFF),
+                      Expanded(
+                        child: _ProgressMetricTile(
+                          label: 'Questions',
+                          value: '$totalQuestions',
+                          icon: Icons.quiz_rounded,
+                          background: const Color(0xFFE2EEFF),
+                          iconColor: const Color(0xFF246BFD),
+                        ),
                       ),
-                      _ProgressStatCard(
-                        title: 'Correct',
-                        value: '$totalCorrect',
-                        icon: Icons.check_circle_rounded,
-                        background: const Color(0xFFDDF8E8),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _ProgressMetricTile(
+                          label: 'Correct',
+                          value: '$totalCorrect',
+                          icon: Icons.check_circle_rounded,
+                          background: const Color(0xFFDDF8E8),
+                          iconColor: const Color(0xFF18A875),
+                        ),
                       ),
-                      _ProgressStatCard(
-                        title: 'Accuracy',
-                        value: '$accuracy%',
-                        icon: Icons.track_changes_rounded,
-                        background: const Color(0xFFFFEBCB),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ProgressMetricTile(
+                          label: 'Sessions',
+                          value: '$practiceSessions',
+                          icon: Icons.history_rounded,
+                          background: const Color(0xFFFFE1F0),
+                          iconColor: const Color(0xFFE05274),
+                        ),
                       ),
-                      _ProgressStatCard(
-                        title: 'Sessions',
-                        value: '$practiceSessions',
-                        icon: Icons.history_rounded,
-                        background: const Color(0xFFFFE1F0),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _ProgressMetricTile(
+                          label: 'Needs Review',
+                          value: '$totalIncorrect',
+                          icon: Icons.replay_rounded,
+                          background: const Color(0xFFFFF0D9),
+                          iconColor: const Color(0xFFE39A00),
+                        ),
                       ),
                     ],
                   ),
 
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 24),
 
                   const Text(
                     'Subject Progress',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
+                      color: Color(0xFF14213D),
                     ),
                   ),
                   const SizedBox(height: 10),
 
                   if (subjectGroups.isEmpty)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 58,
-                            height: 58,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE2EEFF),
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: const Icon(
-                              Icons.auto_graph_rounded,
-                              color: Color(0xFF246BFD),
-                              size: 30,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'No practice data yet',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Complete a practice session and your results will appear here.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
+                    _ProgressEmptyState(
+                      message:
+                          'Complete a practice session and your subject results will appear here.',
                     )
                   else
                     ...subjectGroups.entries.map((entry) {
@@ -6529,77 +7708,96 @@ class ProgressScreen extends StatelessWidget {
                         0,
                         (sum, session) => sum + session.correct,
                       );
-                      final subjectAccuracy =
-                          total == 0 ? 0 : ((correct / total) * 100).round();
+                      final subjectAccuracy = total == 0
+                          ? 0
+                          : ((correct / total) * 100).round();
+
+                      final subjectColor = _subjectColor(entry.key);
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(15),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      entry.key,
-                                      style: const TextStyle(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                  ),
-                                  Text(
-                                    '$subjectAccuracy%',
-                                    style: const TextStyle(
-                                      color: Color(0xFF246BFD),
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                ],
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x1222446B),
+                                blurRadius: 12,
+                                offset: Offset(0, 5),
                               ),
-                              const SizedBox(height: 10),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: LinearProgressIndicator(
-                                  value: subjectAccuracy / 100,
-                                  minHeight: 9,
-                                  backgroundColor: const Color(0xFFEAF0F7),
-                                  valueColor:
-                                      const AlwaysStoppedAnimation<Color>(
-                                    Color(0xFF246BFD),
-                                  ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 45,
+                                height: 45,
+                                decoration: BoxDecoration(
+                                  color: subjectColor.withValues(alpha: 0.10),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Icon(
+                                  _subjectIcon(entry.key),
+                                  color: subjectColor,
+                                  size: 23,
                                 ),
                               ),
-                              const SizedBox(height: 9),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      '$correct correct out of $total questions',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey.shade600,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            entry.key,
+                                            style: const TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w900,
+                                              color: Color(0xFF14213D),
+                                            ),
+                                          ),
+                                        ),
+                                        Text(
+                                          '$subjectAccuracy%',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w900,
+                                            color: subjectColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 7),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: LinearProgressIndicator(
+                                        value: subjectAccuracy / 100,
+                                        minHeight: 7,
+                                        backgroundColor:
+                                            const Color(0xFFEAF0F7),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                          subjectColor,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      '$correct/$total correct ? ${sessions.length} session${sessions.length == 1 ? '' : 's'}',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF718096),
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
-                                  ),
-                                  Text(
-                                    '${sessions.length} session${sessions.length == 1 ? '' : 's'}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade600,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -6607,102 +7805,82 @@ class ProgressScreen extends StatelessWidget {
                       );
                     }),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
 
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Recent Practice',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                      if (totalQuestions > 0)
-                        Text(
-                          '$totalIncorrect incorrect',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                    ],
+                  const Text(
+                    'Recent Practice',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF14213D),
+                    ),
                   ),
                   const SizedBox(height: 10),
 
                   if (recentSessions.isEmpty)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        'Your completed practice sessions will appear here.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                    _ProgressEmptyState(
+                      message:
+                          'Your completed practice sessions will appear here.',
                     )
                   else
                     ...recentSessions.map((session) {
                       final percent = session.total == 0
                           ? 0
                           : ((session.correct / session.total) * 100).round();
+                      final passed = percent >= 70;
 
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.only(bottom: 9),
                         child: Container(
-                          padding: const EdgeInsets.all(15),
+                          padding: const EdgeInsets.all(13),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(18),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x1022446B),
+                                blurRadius: 10,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
                           ),
                           child: Row(
                             children: [
                               Container(
-                                width: 44,
-                                height: 44,
+                                width: 42,
+                                height: 42,
+                                padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: percent >= 70
+                                  color: passed
                                       ? const Color(0xFFDDF8E8)
-                                      : const Color(0xFFFFEBCB),
-                                  borderRadius: BorderRadius.circular(14),
+                                      : const Color(0xFFFFF0D9),
+                                  borderRadius: BorderRadius.circular(13),
                                 ),
-                                child: Icon(
-                                  percent >= 70
-                                      ? Icons.check_rounded
-                                      : Icons.replay_rounded,
-                                  color: percent >= 70
-                                      ? const Color(0xFF18B76A)
-                                      : const Color(0xFFE39A00),
+                                child: Image.asset(
+                                  'assets/tutorai_icons/practice_brain.png',
+                                  fit: BoxFit.contain,
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 11),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       session.subject,
                                       style: const TextStyle(
-                                        fontSize: 15,
+                                        fontSize: 14.5,
                                         fontWeight: FontWeight.w900,
+                                        color: Color(0xFF14213D),
                                       ),
                                     ),
                                     const SizedBox(height: 3),
                                     Text(
-                                      '${session.correct}/${session.total} correct',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey.shade600,
+                                      '${session.correct}/${session.total} correct ? ${_dateLabel(session.completedAt)}',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF718096),
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -6711,9 +7889,12 @@ class ProgressScreen extends StatelessWidget {
                               ),
                               Text(
                                 '$percent%',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w900,
+                                  color: passed
+                                      ? const Color(0xFF18A875)
+                                      : const Color(0xFFE39A00),
                                 ),
                               ),
                             ],
@@ -6731,76 +7912,149 @@ class ProgressScreen extends StatelessWidget {
   }
 }
 
-class _ProgressStatCard extends StatelessWidget {
-  final String title;
+class _ProgressMetricTile extends StatelessWidget {
+  final String label;
   final String value;
   final IconData icon;
   final Color background;
+  final Color iconColor;
 
-  const _ProgressStatCard({
-    required this.title,
+  const _ProgressMetricTile({
+    required this.label,
     required this.value,
     required this.icon,
     required this.background,
+    required this.iconColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 166,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: background,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                icon,
-                color: const Color(0xFF246BFD),
-                size: 21,
-              ),
+    return Container(
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1022446B),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BorderRadius.circular(13),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
+            child: Icon(
+              icon,
+              color: iconColor,
+              size: 21,
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF14213D),
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    color: Color(0xFF718096),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProgressEmptyState extends StatelessWidget {
+  final String message;
+
+  const _ProgressEmptyState({
+    required this.message,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1022446B),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFE9C4),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Image.asset(
+              'assets/tutorai_icons/my_progress.png',
+              fit: BoxFit.contain,
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'No progress yet',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF14213D),
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 12,
+              height: 1.4,
+              color: Color(0xFF718096),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
 class ProfileScreen extends StatefulWidget {
+
+
   const ProfileScreen({super.key});
 
   @override
@@ -6842,8 +8096,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     setState(() {
       _nameController.text = prefs.getString(_nameKey) ?? '';
-      _academicLevel =
-          prefs.getString(_levelKey) ?? 'Senior Secondary';
+      _academicLevel = prefs.getString(_levelKey) ?? 'Senior Secondary';
       _loading = false;
     });
   }
@@ -6967,7 +8220,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 28),
-
           const Text(
             'Profile',
             style: TextStyle(
@@ -6976,7 +8228,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 10),
-
           TextField(
             controller: _nameController,
             textCapitalization: TextCapitalization.words,
@@ -6989,7 +8240,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 14),
-
           DropdownButtonFormField<String>(
             initialValue: _academicLevel,
             decoration: const InputDecoration(
@@ -7011,7 +8261,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             },
           ),
           const SizedBox(height: 16),
-
           SizedBox(
             height: 50,
             child: FilledButton.icon(
@@ -7030,7 +8279,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ),
-
           const SizedBox(height: 28),
           const Text(
             'Settings',
@@ -7040,7 +8288,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 10),
-
           Card(
             child: ListTile(
               leading: const Icon(Icons.lock_outline_rounded),
@@ -7051,7 +8298,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 8),
-
           Card(
             child: ListTile(
               leading: const Icon(Icons.info_outline_rounded),
@@ -7062,7 +8308,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 8),
-
           Card(
             child: ListTile(
               leading: const Icon(Icons.restart_alt_rounded),
@@ -7078,7 +8323,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 }
-
 
 class VoiceTutorScreen extends StatefulWidget {
   const VoiceTutorScreen({super.key});
@@ -7425,9 +8669,10 @@ STUDENT SPOKEN QUESTION:
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed: (_transcript.trim().isEmpty || _busy || _isListening)
-                        ? null
-                        : _askTutor,
+                    onPressed:
+                        (_transcript.trim().isEmpty || _busy || _isListening)
+                            ? null
+                            : _askTutor,
                     icon: const Icon(Icons.auto_awesome_rounded),
                     label: const Text('Ask TutorAI'),
                     style: FilledButton.styleFrom(
@@ -7875,7 +9120,8 @@ $notes
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFDDE6F2)),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
@@ -7958,7 +9204,9 @@ $notes
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              _sourceName.isEmpty ? 'Current notes' : _sourceName,
+                              _sourceName.isEmpty
+                                  ? 'Current notes'
+                                  : _sourceName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -8270,11 +9518,11 @@ class _ExamPrepScreenState extends State<ExamPrepScreen> {
       RegExp(r'\\text\{([^{}]*)\}'),
       r'$1',
     );
-    cleaned = cleaned.replaceAll(r'\times', '×');
-    cleaned = cleaned.replaceAll(r'\cdot', '×');
-    cleaned = cleaned.replaceAll(r'\div', '÷');
-    cleaned = cleaned.replaceAll(r'\pi', 'π');
-    cleaned = cleaned.replaceAll(r'\sqrt', '√');
+    cleaned = cleaned.replaceAll(r'\times', 'Ã—');
+    cleaned = cleaned.replaceAll(r'\cdot', 'Ã—');
+    cleaned = cleaned.replaceAll(r'\div', 'Ã·');
+    cleaned = cleaned.replaceAll(r'\pi', 'Ï€');
+    cleaned = cleaned.replaceAll(r'\sqrt', 'âˆš');
     cleaned = cleaned.replaceAll(r'\log', 'log');
     cleaned = cleaned.replaceAll(RegExp(r'\\([A-Za-z]+)'), r'$1');
 
@@ -8286,7 +9534,8 @@ class _ExamPrepScreenState extends State<ExamPrepScreen> {
   String _buildPrompt() {
     final exam = _selectedExam;
     final subject = _selectedSubject;
-    const formattingRule = '''Formatting rules: Return plain text only. Do not use Markdown headings, bold markers, LaTeX delimiters, or dollar signs as math delimiters. Write fractions as a/b, logarithms as log, and units such as cm^2 in normal text. Keep the questions easy to read on a phone.''';
+    const formattingRule =
+        '''Formatting rules: Return plain text only. Do not use Markdown headings, bold markers, LaTeX delimiters, or dollar signs as math delimiters. Write fractions as a/b, logarithms as log, and units such as cm^2 in normal text. Keep the questions easy to read on a phone.''';
 
     switch (_selectedMode) {
       case 'Timed Mock':
@@ -8504,7 +9753,8 @@ Requirements:
                       borderRadius: BorderRadius.circular(14),
                       borderSide: const BorderSide(color: Color(0xFFD6E0EC)),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 14),
                   ),
                   items: [
                     for (final subject in _availableSubjects)
@@ -8606,7 +9856,7 @@ Requirements:
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '$_selectedExam • $_selectedSubject',
+                          '$_selectedExam â€¢ $_selectedSubject',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w900,
@@ -8665,20 +9915,20 @@ class PlaceholderScreen extends StatelessWidget {
   const PlaceholderScreen({super.key, required this.title});
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(title)),
-    body: Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          '$title\nComing in the next MVP build',
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+        appBar: AppBar(title: Text(title)),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              '$title\nComing in the next MVP build',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            ),
+          ),
         ),
-      ),
-    ),
-  );
+      );
 }
 
-List<BoxShadow> _softShadow() => const [BoxShadow(color: Color(0x1A22446B), blurRadius: 18, offset: Offset(0, 7))];
-
-
+List<BoxShadow> _softShadow() => const [
+      BoxShadow(color: Color(0x1A22446B), blurRadius: 18, offset: Offset(0, 7))
+    ];
