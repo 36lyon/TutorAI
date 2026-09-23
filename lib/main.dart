@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_pdf_text/flutter_pdf_text.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -20,6 +21,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await studyPlanStore.load();
   await tutorProgress.load();
+  await tutorNotifications.load();
   runApp(const TutorAiApp());
 }
 
@@ -167,6 +169,189 @@ class TutorProgressStore extends ChangeNotifier {
   }
 }
 
+class TutorNotification {
+  final String id;
+  final String title;
+  final String body;
+  final String type;
+  final String? route;
+  final DateTime createdAt;
+  final bool isRead;
+
+  const TutorNotification({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.type,
+    required this.route,
+    required this.createdAt,
+    required this.isRead,
+  });
+
+  TutorNotification copyWith({bool? isRead}) {
+    return TutorNotification(
+      id: id,
+      title: title,
+      body: body,
+      type: type,
+      route: route,
+      createdAt: createdAt,
+      isRead: isRead ?? this.isRead,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'body': body,
+    'type': type,
+    'route': route,
+    'createdAt': createdAt.toIso8601String(),
+    'isRead': isRead,
+  };
+
+  static TutorNotification? fromJson(dynamic raw) {
+    if(raw is! Map)return null;
+    final data=Map<String,dynamic>.from(raw);
+    final id=data['id'];
+    final title=data['title'];
+    final body=data['body'];
+    final type=data['type'];
+    final route=data['route'];
+    final createdAt=data['createdAt'];
+    final isRead=data['isRead'];
+
+    if(id is! String ||
+       title is! String ||
+       body is! String ||
+       type is! String ||
+       createdAt is! String ||
+       isRead is! bool ||
+       (route!=null && route is! String))return null;
+
+    final parsed=DateTime.tryParse(createdAt);
+    if(parsed==null)return null;
+
+    return TutorNotification(
+      id:id,
+      title:title,
+      body:body,
+      type:type,
+      route:route as String?,
+      createdAt:parsed,
+      isRead:isRead,
+    );
+  }
+}
+
+class TutorNotificationStore extends ChangeNotifier {
+  static const String _storageKey='tutor_ai_notifications_v1';
+
+  final List<TutorNotification> _notifications=<TutorNotification>[];
+  bool _loaded=false;
+
+  List<TutorNotification> get notifications =>
+      List<TutorNotification>.unmodifiable(_notifications);
+
+  int get unreadCount =>
+      _notifications.where((item)=>!item.isRead).length;
+
+  Future<void> load() async {
+    if(_loaded)return;
+
+    final prefs=await SharedPreferences.getInstance();
+    final raw=prefs.getString(_storageKey);
+    _notifications.clear();
+
+    if(raw!=null && raw.isNotEmpty){
+      try{
+        final decoded=jsonDecode(raw);
+        if(decoded is List){
+          for(final item in decoded){
+            final n=TutorNotification.fromJson(item);
+            if(n!=null)_notifications.add(n);
+          }
+        }
+      }catch(_){
+        _notifications.clear();
+      }
+    }
+
+    if(_notifications.isEmpty){
+      final now=DateTime.now();
+
+      _notifications.addAll([
+        TutorNotification(
+          id:'welcome',
+          title:'Welcome to TutorAI',
+          body:'Your AI tutor is ready. Explore Learn, Practice, Snap a Question and Exams.',
+          type:'welcome',
+          route:null,
+          createdAt:now,
+          isRead:false,
+        ),
+        TutorNotification(
+          id:'snap_tip',
+          title:'Try Snap a Question',
+          body:'Scan a school question and TutorAI will explain it step by step.',
+          type:'camera',
+          route:'snap',
+          createdAt:now.subtract(const Duration(minutes:1)),
+          isRead:false,
+        ),
+        TutorNotification(
+          id:'progress_tip',
+          title:'Track your progress',
+          body:'Open My Progress to review your practice sessions and accuracy.',
+          type:'progress',
+          route:'progress',
+          createdAt:now.subtract(const Duration(minutes:2)),
+          isRead:false,
+        ),
+      ]);
+
+      await _persist();
+    }
+
+    _loaded=true;
+    notifyListeners();
+  }
+
+  Future<void> markRead(String id) async {
+    final index=_notifications.indexWhere((item)=>item.id==id);
+    if(index<0 || _notifications[index].isRead)return;
+
+    _notifications[index]=_notifications[index].copyWith(isRead:true);
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> markAllRead() async {
+    var changed=false;
+
+    for(var i=0;i<_notifications.length;i++){
+      if(!_notifications[i].isRead){
+        _notifications[i]=_notifications[i].copyWith(isRead:true);
+        changed=true;
+      }
+    }
+
+    if(!changed)return;
+
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> _persist() async {
+    final prefs=await SharedPreferences.getInstance();
+    await prefs.setString(
+      _storageKey,
+      jsonEncode(_notifications.map((item)=>item.toJson()).toList()),
+    );
+  }
+}
+
+final TutorNotificationStore tutorNotifications=TutorNotificationStore();
 final TutorProgressStore tutorProgress = TutorProgressStore();
 
 class TutorAiApp extends StatelessWidget {
@@ -575,49 +760,71 @@ class _HomeHero extends StatelessWidget {
             ),
           ),
 
-          // Notification stays in the top-right corner.
+                    // Notification Center opens from the top-right bell.
           Positioned(
             right: 1,
             top: 6,
-            child: Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: _softShadow(),
-              ),
-              child: const Stack(
-                children: [
-                  Center(
-                    child: Icon(
-                      Icons.notifications_none_rounded,
-                      color: Color(0xFF132A4F),
-                      size: 27,
-                    ),
-                  ),
-                  Positioned(
-                    top: 0,
-                    right: 1,
-                    child: CircleAvatar(
-                      radius: 8.5,
-                      backgroundColor: Color(0xFFEF476F),
-                      child: Text(
-                        '3',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
+            child: AnimatedBuilder(
+              animation: tutorNotifications,
+              builder: (context, _) {
+                final unread = tutorNotifications.unreadCount;
+
+                return Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(14),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const NotificationCenterScreen(),
                         ),
+                      );
+                    },
+                    child: Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: _softShadow(),
+                      ),
+                      child: Stack(
+                        children: [
+                          const Center(
+                            child: Icon(
+                              Icons.notifications_none_rounded,
+                              color: Color(0xFF132A4F),
+                              size: 27,
+                            ),
+                          ),
+                          if (unread > 0)
+                            Positioned(
+                              top: 0,
+                              right: 1,
+                              child: CircleAvatar(
+                                radius: 8.5,
+                                backgroundColor:
+                                    const Color(0xFFEF476F),
+                                child: Text(
+                                  unread > 99 ? '99+' : '$unread',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
           ),
-
-          // Search bar remains below the greeting; its microphone is inside the bar.
+// Search bar remains below the greeting; its microphone is inside the bar.
           Positioned(
             left: 2,
             right: 2,
@@ -2225,6 +2432,7 @@ class _SnapQuestionScreenState extends State<SnapQuestionScreen> {
     );
 
     _scanner = scanner;
+    XFile? capturedImage;
 
     try {
       final result = await scanner.scanDocument();
@@ -2237,11 +2445,7 @@ class _SnapQuestionScreenState extends State<SnapQuestionScreen> {
         return;
       }
 
-      setState(() => _busy = false);
-
-      _openQuestionComposer(
-        image: XFile(images.first),
-      );
+      capturedImage = XFile(images.first);
     } catch (error) {
       debugPrint('TutorAI DOCUMENT SCANNER ERROR: $error');
 
@@ -2258,8 +2462,19 @@ class _SnapQuestionScreenState extends State<SnapQuestionScreen> {
       );
     } finally {
       await scanner.close();
-      _scanner = null;
+
+      if (identical(_scanner, scanner)) {
+        _scanner = null;
+      }
     }
+
+    if (!mounted || capturedImage == null) return;
+
+    setState(() => _busy = false);
+
+    _openQuestionComposer(
+      image: capturedImage,
+    );
   }
 
   void _openQuestionComposer({XFile? image}) {
@@ -2373,12 +2588,71 @@ class QuestionComposerScreen extends StatefulWidget {
 
 class _QuestionComposerScreenState extends State<QuestionComposerScreen> {
   final TextEditingController _questionController = TextEditingController();
+  final TextRecognizer _textRecognizer = TextRecognizer(
+    script: TextRecognitionScript.latin,
+  );
+
   bool _analyzing = false;
+  bool _extractingText = false;
 
   @override
   void dispose() {
     _questionController.dispose();
+    _textRecognizer.close();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    if (widget.image != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _extractQuestionText();
+      });
+    }
+  }
+
+  Future<void> _extractQuestionText() async {
+    final image = widget.image;
+
+    if (image == null || _extractingText) return;
+
+    setState(() {
+      _extractingText = true;
+    });
+
+    try {
+      final inputImage = InputImage.fromFilePath(image.path);
+      final recognizedText = await _textRecognizer.processImage(inputImage);
+      final text = recognizedText.text.trim();
+
+      if (!mounted) return;
+
+      if (text.isEmpty) {
+        setState(() {
+          _extractingText = false;
+        });
+        return;
+      }
+
+      _questionController.value = TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
+
+      setState(() {
+        _extractingText = false;
+      });
+    } catch (error) {
+      debugPrint('TutorAI OCR ERROR: $error');
+
+      if (!mounted) return;
+
+      setState(() {
+        _extractingText = false;
+      });
+    }
   }
 
   Future<void> _analyze() async {
@@ -7410,6 +7684,188 @@ class _AchievementBadgeCard extends StatelessWidget {
   }
 }
 
+class NotificationCenterScreen extends StatelessWidget {
+  const NotificationCenterScreen({super.key});
+
+  IconData _iconFor(String type){
+    switch(type){
+      case 'camera': return Icons.camera_alt_rounded;
+      case 'progress': return Icons.insights_rounded;
+      default: return Icons.notifications_rounded;
+    }
+  }
+
+  String _time(DateTime time){
+    final d=DateTime.now().difference(time);
+    if(d.inMinutes<1)return 'Just now';
+    if(d.inMinutes<60)return '${d.inMinutes}m ago';
+    if(d.inHours<24)return '${d.inHours}h ago';
+    if(d.inDays<7)return '${d.inDays}d ago';
+    return '${time.day}/${time.month}/${time.year}';
+  }
+
+  void _openRoute(BuildContext context,String route){
+    switch(route){
+      case 'snap':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder:(_)=>const SnapQuestionScreen(),
+          ),
+        );
+        break;
+      case 'progress':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder:(_)=>const ProgressScreen(),
+          ),
+        );
+        break;
+    }
+  }
+
+  Future<void> _tap(
+    BuildContext context,
+    TutorNotification item,
+  ) async {
+    await tutorNotifications.markRead(item.id);
+
+    if(!context.mounted)return;
+
+    if(item.route!=null){
+      _openRoute(context,item.route!);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context){
+    return Scaffold(
+      appBar:AppBar(
+        title:const Text('Notifications'),
+        centerTitle:true,
+        actions:[
+          AnimatedBuilder(
+            animation:tutorNotifications,
+            builder:(context,_){
+              final unread=tutorNotifications.unreadCount;
+
+              return IconButton(
+                tooltip:'Mark all as read',
+                onPressed:unread==0
+                    ?null
+                    :()=>tutorNotifications.markAllRead(),
+                icon:const Icon(Icons.done_all_rounded),
+              );
+            },
+          ),
+        ],
+      ),
+      body:AnimatedBuilder(
+        animation:tutorNotifications,
+        builder:(context,_){
+          final items=tutorNotifications.notifications;
+
+          return ListView.separated(
+            padding:const EdgeInsets.fromLTRB(16,16,16,28),
+            itemCount:items.length,
+            separatorBuilder:(_,__)=>const SizedBox(height:10),
+            itemBuilder:(context,index){
+              final item=items[index];
+
+              return Material(
+                color:item.isRead
+                    ?Colors.white
+                    :const Color(0xFFF4F8FF),
+                borderRadius:BorderRadius.circular(18),
+                child:InkWell(
+                  borderRadius:BorderRadius.circular(18),
+                  onTap:()=>_tap(context,item),
+                  child:Container(
+                    padding:const EdgeInsets.all(15),
+                    decoration:BoxDecoration(
+                      borderRadius:BorderRadius.circular(18),
+                      border:Border.all(
+                        color:item.isRead
+                            ?const Color(0xFFE4EAF2)
+                            :const Color(0xFFCFE0FF),
+                      ),
+                    ),
+                    child:Row(
+                      crossAxisAlignment:CrossAxisAlignment.start,
+                      children:[
+                        Container(
+                          width:46,
+                          height:46,
+                          decoration:BoxDecoration(
+                            color:const Color(0xFFE8F0FF),
+                            borderRadius:BorderRadius.circular(14),
+                          ),
+                          child:Icon(
+                            _iconFor(item.type),
+                            color:const Color(0xFF1F5FD2),
+                          ),
+                        ),
+                        const SizedBox(width:12),
+                        Expanded(
+                          child:Column(
+                            crossAxisAlignment:CrossAxisAlignment.start,
+                            children:[
+                              Row(
+                                children:[
+                                  Expanded(
+                                    child:Text(
+                                      item.title,
+                                      style:TextStyle(
+                                        fontSize:15.5,
+                                        fontWeight:item.isRead
+                                            ?FontWeight.w700
+                                            :FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                  if(!item.isRead)
+                                    Container(
+                                      width:9,
+                                      height:9,
+                                      decoration:const BoxDecoration(
+                                        color:Color(0xFFEF476F),
+                                        shape:BoxShape.circle,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height:5),
+                              Text(
+                                item.body,
+                                style:const TextStyle(
+                                  color:Color(0xFF5F6F84),
+                                  fontSize:13,
+                                  height:1.4,
+                                ),
+                              ),
+                              const SizedBox(height:7),
+                              Text(
+                                _time(item.createdAt),
+                                style:const TextStyle(
+                                  color:Color(0xFF8A97A8),
+                                  fontSize:11.5,
+                                  fontWeight:FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
 class ProgressScreen extends StatelessWidget {
   const ProgressScreen({super.key});
 
@@ -7469,7 +7925,12 @@ class ProgressScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
+    return DefaultTextStyle.merge(
+      style: const TextStyle(
+        fontFamily: 'Roboto',
+        decoration: TextDecoration.none,
+      ),
+      child: AnimatedBuilder(
       animation: tutorProgress,
       builder: (context, _) {
         final totalQuestions = tutorProgress.totalQuestions;
@@ -7908,11 +8369,10 @@ class ProgressScreen extends StatelessWidget {
           ),
         );
       },
+      ),
     );
   }
-}
-
-class _ProgressMetricTile extends StatelessWidget {
+}class _ProgressMetricTile extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
