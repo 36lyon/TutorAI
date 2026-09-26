@@ -15,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import './study_plan.dart' as study_plan;
 import './study_plan_screen.dart' as study_plan_ui;
 import './premium_screen.dart';
+import './premium_store.dart';
 
 final study_plan.StudyPlanStore studyPlanStore = study_plan.StudyPlanStore();
 
@@ -9112,6 +9113,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _academicLevel = 'Senior Secondary';
   bool _loading = true;
   bool _saving = false;
+  final TutorPremiumStore _premiumStore = TutorPremiumStore();
 
   static const List<String> _academicLevels = <String>[
     'Junior Secondary',
@@ -9133,6 +9135,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadProfile() async {
     final prefs = await SharedPreferences.getInstance();
+    await _premiumStore.load();
+    await _premiumStore.load();
 
     if (!mounted) return;
 
@@ -9350,7 +9354,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
             ),
           ),
-          const SizedBox(height: 8),          Card(
+          const SizedBox(height: 8),          const SizedBox(height: 10),
+          Card(
+            child: ListTile(
+              leading: _TutorAi3DIcon(
+                icon: _premiumStore.isActive
+                    ? Icons.verified_rounded
+                    : Icons.payment_outlined,
+                size: 30,
+                colors: _premiumStore.isActive
+                    ? const [
+                        Color(0xFF86EFAC),
+                        Color(0xFF22C55E),
+                        Color(0xFF15803D),
+                      ]
+                    : const [
+                        Color(0xFFFFF176),
+                        Color(0xFFFFC107),
+                        Color(0xFFFF8F00),
+                      ],
+              ),
+              title: const Text('Payment status'),
+              subtitle: Text(
+                _premiumStore.isActive
+                    ? 'Premium active - Plan: ${_premiumStore.plan.isEmpty ? 'Unknown' : _premiumStore.plan}\nEmail: ${_premiumStore.email}\nReference: ${_premiumStore.reference}'
+                    : 'No active Premium subscription is currently saved on this device.',
+              ),
+              trailing: const Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 16,
+              ),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const PremiumScreen(),
+                  ),
+                );
+              },
+            ),
+          ),          Card(
             child: ListTile(
               leading: const Icon(Icons.lock_outline_rounded),
               title: const Text('Profile data'),
@@ -10994,6 +11036,8 @@ class PlaceholderScreen extends StatelessWidget {
 List<BoxShadow> _softShadow() => const [
       BoxShadow(color: Color(0x1A22446B), blurRadius: 18, offset: Offset(0, 7))
     ];
+
+
 
 
 
