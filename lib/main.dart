@@ -6943,7 +6943,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
     required bool correct,
   }) {
     if (correct) {
-      return 'Correct!\\n\\n'
+      return 'Correct!\n\n'
           'Why your answer is correct:\n'
           '${question.explanation}\n\n'
           'Key idea:\n'
@@ -6952,7 +6952,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
           'Before moving on, explain the key idea in your own words. That helps turn the answer into understanding.';
     }
 
-    return 'Let us learn from it.\\n\\n'
+    return 'Let us learn from it.\n\n'
         'Your answer:\n'
         '$entered\n\n'
         'Correct answer:\n'
@@ -10994,5 +10994,6 @@ class PlaceholderScreen extends StatelessWidget {
 List<BoxShadow> _softShadow() => const [
       BoxShadow(color: Color(0x1A22446B), blurRadius: 18, offset: Offset(0, 7))
     ];
+
 
 
