@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -248,20 +248,34 @@ class TutorNotification {
 
 class TutorNotificationStore extends ChangeNotifier {
   static const String _storageKey='tutor_ai_notifications_v1';
+  static const String _notificationsEnabledKey='tutor_ai_notifications_enabled_v1';
 
   final List<TutorNotification> _notifications=<TutorNotification>[];
   bool _loaded=false;
+  bool _notificationsEnabled=true;
 
   List<TutorNotification> get notifications =>
       List<TutorNotification>.unmodifiable(_notifications);
 
+  bool get notificationsEnabled => _notificationsEnabled;
+
   int get unreadCount =>
-      _notifications.where((item)=>!item.isRead).length;
+      _notificationsEnabled
+          ? _notifications.where((item)=>!item.isRead).length
+          : 0;
+
+  Future<void> setNotificationsEnabled(bool enabled) async {
+    _notificationsEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_notificationsEnabledKey, enabled);
+    notifyListeners();
+  }
 
   Future<void> load() async {
     if(_loaded)return;
 
     final prefs=await SharedPreferences.getInstance();
+    _notificationsEnabled = prefs.getBool(_notificationsEnabledKey) ?? true;
     final raw=prefs.getString(_storageKey);
     _notifications.clear();
 
@@ -9136,7 +9150,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadProfile() async {
     final prefs = await SharedPreferences.getInstance();
     await _premiumStore.load();
-    await _premiumStore.load();
 
     if (!mounted) return;
 
@@ -9392,6 +9405,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 );
               },
             ),
+          ),          const SizedBox(height: 10),
+          Card(
+            child: SwitchListTile.adaptive(
+              value: tutorNotifications.notificationsEnabled,
+              onChanged: (enabled) {
+                tutorNotifications.setNotificationsEnabled(enabled).then((_) {
+                  if (mounted) setState(() {});
+                });
+              },
+              secondary: _TutorAi3DIcon(
+                icon: Icons.notifications_active_rounded,
+                size: 30,
+                colors: const [
+                  Color(0xFF77C2FF),
+                  Color(0xFF2085F5),
+                  Color(0xFF0B5ED7),
+                ],
+              ),
+              title: const Text('Notification badge'),
+              subtitle: const Text(
+                'Show the unread notification count on the home screen.',
+              ),
+            ),
           ),          Card(
             child: ListTile(
               leading: const Icon(Icons.lock_outline_rounded),
@@ -9411,7 +9447,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 24),
+          const Text(
+            'Account Controls',
+            style: TextStyle(
+              fontSize: 21,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
           Card(
             child: ListTile(
               leading: const Icon(Icons.restart_alt_rounded),
@@ -11036,6 +11080,8 @@ class PlaceholderScreen extends StatelessWidget {
 List<BoxShadow> _softShadow() => const [
       BoxShadow(color: Color(0x1A22446B), blurRadius: 18, offset: Offset(0, 7))
     ];
+
+
 
 
 
