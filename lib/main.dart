@@ -9448,6 +9448,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 24),
+          Card(
+            child: ListTile(
+              leading: _TutorAi3DIcon(
+                icon: Icons.help_center_rounded,
+                size: 30,
+                colors: const [
+                  Color(0xFF77C2FF),
+                  Color(0xFF2085F5),
+                  Color(0xFF0B5ED7),
+                ],
+              ),
+              title: const Text('Help & Support'),
+              subtitle: const Text('Learn how to get help while using TutorAI.'),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+              onTap: () {
+                showDialog<void>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Help & Support'),
+                    content: const Text(
+                      'For help with your studies, use Ask Tutor for questions, Learn for guided lessons, Practice for step-by-step practice, and Snap Question when you want TutorAI to work from a photo of a question.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Close'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 24),
           const Text(
             'Account Controls',
             style: TextStyle(
