@@ -9430,11 +9430,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),          Card(
             child: ListTile(
-              leading: const Icon(Icons.lock_outline_rounded),
+              leading: _TutorAi3DIcon(
+                icon: Icons.lock_outline_rounded,
+                size: 30,
+                colors: const [
+                  Color(0xFF77C2FF),
+                  Color(0xFF2085F5),
+                  Color(0xFF0B5ED7),
+                ],
+              ),
               title: const Text('Profile data'),
               subtitle: const Text(
                 'Your profile name and academic level are stored locally on this device.',
               ),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+              onTap: () {
+                final name = _nameController.text.trim().isEmpty
+                    ? 'Student'
+                    : _nameController.text.trim();
+                showDialog<void>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Profile data'),
+                    content: Text(
+                      'Student name: $name\n\nAcademic level: $_academicLevel\n\nThis profile information is stored locally on this device.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Close'),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
           const SizedBox(height: 8),
