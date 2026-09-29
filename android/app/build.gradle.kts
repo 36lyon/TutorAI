@@ -48,6 +48,23 @@ kotlin {
     }
 }
 
+dependencies {
+    implementation("com.paystack.android:paystack-ui:0.0.9")
+    implementation("androidx.compose.animation:animation:1.4.1")
+    implementation("androidx.compose.animation:animation-core:1.4.1")
+}
+
+configurations.all {
+    resolutionStrategy.force(
+        "androidx.compose.animation:animation:1.4.1",
+        "androidx.compose.animation:animation-core:1.4.1"
+    )
+}
+
 flutter {
     source = "../.."
 }
+
+
+
+

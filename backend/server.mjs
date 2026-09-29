@@ -1,4 +1,4 @@
-﻿import http from 'node:http';
+import http from 'node:http';
 
 const port = Number(process.env.PORT || 8787);
 
@@ -65,6 +65,19 @@ const ollamaBaseUrl = (
 
 const ollamaApiKey = process.env.OLLAMA_API_KEY || 'ollama';
 const ollamaModel = process.env.OLLAMA_MODEL || 'gemma3:1b';
+const paystackPublicKey = (process.env.PAYSTACK_PUBLIC_KEY || '').trim();
+const paystackSecretKey = (process.env.PAYSTACK_SECRET_KEY || '').trim();
+
+const paystackPlanWeekly = (process.env.PAYSTACK_PLAN_WEEKLY || '').trim();
+const paystackPlanMonthly = (process.env.PAYSTACK_PLAN_MONTHLY || '').trim();
+const paystackPlanYearly = (process.env.PAYSTACK_PLAN_YEARLY || '').trim();
+
+const paystackPlans = Object.freeze({
+  weekly: paystackPlanWeekly,
+  monthly: paystackPlanMonthly,
+  yearly: paystackPlanYearly,
+});
+
 
 // ============================================================
 // HTTP HELPERS
@@ -971,6 +984,154 @@ async function tutorChat(req, res) {
 }
 
 // ============================================================
+
+// ============================================================
+// PAYSTACK INITIALIZE TRANSACTION
+// ============================================================
+
+async function paystackInitializeTransaction(req, res) {
+  if (!paystackSecretKey) {
+    return send(res, 503, {
+      error: 'Paystack is not configured.',
+    });
+  }
+
+  const body = await readJson(req);
+
+  const email = normalizeText(body.email).toLowerCase();
+  const plan = normalizeText(body.plan).toLowerCase();
+
+  if (!email || !email.includes('@')) {
+    return send(res, 400, {
+      error: 'A valid email address is required.',
+    });
+  }
+
+  if (!['weekly', 'monthly', 'yearly'].includes(plan)) {
+    return send(res, 400, {
+      error: 'Invalid TutorAI Premium plan.',
+    });
+  }
+
+  const planCode = paystackPlans[plan];
+
+  if (!planCode) {
+    return send(res, 503, {
+      error: 'The selected Paystack plan is not configured.',
+    });
+  }
+
+  const response = await fetch(
+    'https://api.paystack.co/transaction/initialize',
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: 'Bearer ' + paystackSecretKey,
+      },
+      body: JSON.stringify({
+        email,
+        plan: planCode,
+        currency: 'NGN',
+        metadata: {
+          product: 'TutorAI Premium',
+          plan,
+        },
+      }),
+    },
+  );
+
+  const raw = await response.text();
+
+  let data;
+
+  try {
+    data = JSON.parse(raw);
+  } catch (_) {
+    return send(res, 502, {
+      error: 'Invalid response received from Paystack.',
+    });
+  }
+
+  if (!response.ok || data?.status !== true) {
+    return send(res, 502, {
+      error: data?.message || 'Paystack transaction initialization failed.',
+    });
+  }
+
+  return send(res, 200, {
+    status: true,
+    publicKey: paystackPublicKey,
+    accessCode: data?.data?.access_code || '',
+    reference: data?.data?.reference || '',
+  });
+}
+
+// ============================================================
+// PAYSTACK VERIFY TRANSACTION
+// ============================================================
+
+async function paystackVerifyTransaction(req, res) {
+  if (!paystackSecretKey) {
+    return send(res, 503, {
+      error: 'Paystack is not configured.',
+    });
+  }
+
+  const body = await readJson(req);
+  const reference = normalizeText(body.reference);
+
+  if (!reference) {
+    return send(res, 400, {
+      error: 'A Paystack transaction reference is required.',
+    });
+  }
+
+  const response = await fetch(
+    'https://api.paystack.co/transaction/verify/' +
+      encodeURIComponent(reference),
+    {
+      method: 'GET',
+      headers: {
+        authorization: 'Bearer ' + paystackSecretKey,
+      },
+    },
+  );
+
+  const raw = await response.text();
+
+  let data;
+
+  try {
+    data = JSON.parse(raw);
+  } catch (_) {
+    return send(res, 502, {
+      error: 'Invalid response received from Paystack.',
+    });
+  }
+
+  if (!response.ok || data?.status !== true || !data?.data) {
+    return send(res, 502, {
+      error: data?.message || 'Paystack transaction verification failed.',
+    });
+  }
+
+  const transaction = data.data;
+
+  return send(res, 200, {
+    status: true,
+    reference: transaction.reference || '',
+    transactionStatus: transaction.status || '',
+    amount: transaction.amount || 0,
+    currency: transaction.currency || '',
+    paidAt: transaction.paid_at || null,
+    customerEmail: transaction.customer?.email || '',
+    planCode:
+      typeof transaction.plan === 'string'
+        ? transaction.plan
+        : transaction.plan?.plan_code || '',
+  });
+}
 // SERVER
 // ============================================================
 
@@ -1024,6 +1185,16 @@ const server = http.createServer(async (req, res) => {
       return await tutorChat(req, res);
     }
 
+    // --------------------------
+    // PAYSTACK
+    // --------------------------
+
+    if (req.method === 'POST' && req.url === '/v1/paystack/initialize') {
+      return await paystackInitializeTransaction(req, res);
+    }
+    if (req.method === 'POST' && req.url === '/v1/paystack/verify') {
+      return await paystackVerifyTransaction(req, res);
+    }
     return send(res, 404, {
       error: 'Not found',
     });
