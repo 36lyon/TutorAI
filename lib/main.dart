@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -2062,7 +2062,7 @@ class _AskTutorAIScreenState extends State<AskTutorAIScreen> {
         requested >= 1 &&
         requested <= solution.steps.length) {
       final step = solution.steps[requested - 1];
-      return 'Let’s go back to Step $requested.\n\n${step.body}\n\nWhy we do it:\n${step.why}\n\nTell me the exact word, number, or operation that is still confusing.';
+      return 'Letâ€™s go back to Step $requested.\n\n${step.body}\n\nWhy we do it:\n${step.why}\n\nTell me the exact word, number, or operation that is still confusing.';
     }
 
     if (q.contains('another') || q.contains('example')) {
@@ -2075,7 +2075,7 @@ class _AskTutorAIScreenState extends State<AskTutorAIScreen> {
         q.contains('stuck')) {
       final step = solution.steps.isEmpty ? null : solution.steps.first;
       if (step != null) {
-        return 'Let’s slow it down.\n\n${step.body}\n\nWhy:\n${step.why}\n\nIf that is not the part you mean, tell me the exact number or step where you are stuck.';
+        return 'Letâ€™s slow it down.\n\n${step.body}\n\nWhy:\n${step.why}\n\nIf that is not the part you mean, tell me the exact number or step where you are stuck.';
       }
     }
 
@@ -3264,7 +3264,7 @@ _SimpleFraction? _parseFraction(String text) {
 
 String _normalizeQuestion(String raw) {
   var q = raw.trim();
-  q = q.replaceAll('×', '*').replaceAll('÷', '/').replaceAll('−', '-');
+  q = q.replaceAll('Ã—', '*').replaceAll('Ã·', '/').replaceAll('âˆ’', '-');
   q = q.replaceAll(RegExp(r'\s+'), ' ');
   q = q.replaceAll(
       RegExp(r'^(what is|calculate|solve|find|work out|please calculate)\s+',
@@ -3549,7 +3549,7 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
           TutorStepData(
             title: 'Perform the fraction operation',
             body:
-                '${af.display} ${op == '/' ? '÷' : op} ${bf.display} = ${result.display}.',
+                '${af.display} ${op == '/' ? 'Ã·' : op} ${bf.display} = ${result.display}.',
             why:
                 'Now the problem follows the normal fraction operation rule for $op.',
           ),
@@ -3579,7 +3579,7 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
     final power = int.parse(exponent.group(2)!);
     final base = double.parse(baseText);
     final value = math.pow(base, power).toDouble();
-    final repeated = List.filled(power, baseText).join(' × ');
+    final repeated = List.filled(power, baseText).join(' Ã— ');
     return TutorSolution(
       question: cleaned,
       topic: 'Exponents and Powers',
@@ -3658,20 +3658,20 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
           body:
               'We are looking for a number that multiplies by itself to make $rootTextFor(radicand).',
           why:
-              'A square root reverses squaring: √n asks which number has square n.',
+              'A square root reverses squaring: âˆšn asks which number has square n.',
         ),
         TutorStepData(
           title: 'Find the matching square',
           body: exactSquare
-              ? '${rounded.toInt()} × ${rounded.toInt()} = ${_formatNumber(radicand)}'
-              : '√${_formatNumber(radicand)} ≈ ${_formatNumber(value)}',
+              ? '${rounded.toInt()} Ã— ${rounded.toInt()} = ${_formatNumber(radicand)}'
+              : 'âˆš${_formatNumber(radicand)} â‰ˆ ${_formatNumber(value)}',
           why:
               'The answer is the number whose square is the value under the root.',
         ),
         TutorStepData(
           title: 'Check by squaring',
           body:
-              '${_formatNumber(value)} × ${_formatNumber(value)} ≈ ${_formatNumber(value * value)}.',
+              '${_formatNumber(value)} Ã— ${_formatNumber(value)} â‰ˆ ${_formatNumber(value * value)}.',
           why:
               'Squaring the result should return the original radicand, allowing a direct inverse-operation check.',
         ),
@@ -3709,7 +3709,7 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
           body:
               'We want the largest whole number that divides both $a and $b with no remainder.',
           why:
-              'The word “common” means it works for both numbers, and “greatest” means we choose the largest such factor.',
+              'The word â€œcommonâ€ means it works for both numbers, and â€œgreatestâ€ means we choose the largest such factor.',
         ),
         TutorStepData(
           title: 'Use the remainder process',
@@ -3764,20 +3764,20 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
           TutorStepData(
             title: 'Find the common multiple efficiently',
             body:
-                'Use LCM(a,b) = (a × b) ÷ GCF(a,b).\nGCF($a,$b) = $g.\nSo LCM = ($a × $b) ÷ $g = $lcm.',
+                'Use LCM(a,b) = (a Ã— b) Ã· GCF(a,b).\nGCF($a,$b) = $g.\nSo LCM = ($a Ã— $b) Ã· $g = $lcm.',
             why:
                 'Dividing by the GCF removes the shared factor that would otherwise be counted twice.',
           ),
           TutorStepData(
             title: 'Check the answer',
-            body: '$a × ${lcm ~/ a} = $lcm and $b × ${lcm ~/ b} = $lcm.',
+            body: '$a Ã— ${lcm ~/ a} = $lcm and $b Ã— ${lcm ~/ b} = $lcm.',
             why:
                 'Both original numbers must divide the LCM exactly, and no smaller positive common multiple should exist.',
           ),
         ],
         answer: lcm.toString(),
         methodSummary:
-            'Find the GCF, use LCM = (a × b) ÷ GCF, then verify both numbers divide the result.',
+            'Find the GCF, use LCM = (a Ã— b) Ã· GCF, then verify both numbers divide the result.',
         example: 'LCM of 6 and 8 = 24',
         supported: true,
       );
@@ -3842,7 +3842,7 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
           TutorStepData(
             title: 'Divide by the coefficient',
             body:
-                'x = ${_formatNumber(target)} ÷ ${_formatNumber(combined)} = $xText.',
+                'x = ${_formatNumber(target)} Ã· ${_formatNumber(combined)} = $xText.',
             why:
                 'Division undoes multiplication by the coefficient, leaving x by itself.',
           ),
@@ -3857,7 +3857,7 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
         answer: 'x = $xText',
         methodSummary:
             'Collect x terms, collect constants, isolate x, then verify by substitution.',
-        example: '2x + 5 = x + 12 → x = 7',
+        example: '2x + 5 = x + 12 â†’ x = 7',
         supported: true,
       );
     }
@@ -3865,7 +3865,7 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
 
   // Geometry: rectangle, square, triangle and circle.
   final rect = RegExp(
-    r'^\s*(?:area\s+of\s+)?(?:a\s+)?rectangle\s+(?:with\s+)?(?:length\s+)?(-?(?:\d+(?:\.\d+)?|\.\d+))\s*(?:and|by|x|×)\s*(-?(?:\d+(?:\.\d+)?|\.\d+))\s*$',
+    r'^\s*(?:area\s+of\s+)?(?:a\s+)?rectangle\s+(?:with\s+)?(?:length\s+)?(-?(?:\d+(?:\.\d+)?|\.\d+))\s*(?:and|by|x|Ã—)\s*(-?(?:\d+(?:\.\d+)?|\.\d+))\s*$',
     caseSensitive: false,
   ).firstMatch(lower);
   if (rect != null) {
@@ -3885,7 +3885,7 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
         TutorStepData(
           title: 'Use the area formula',
           body:
-              'Area = length × width\n= ${_formatNumber(l)} × ${_formatNumber(w)}\n= ${_formatNumber(area)} square units.',
+              'Area = length Ã— width\n= ${_formatNumber(l)} Ã— ${_formatNumber(w)}\n= ${_formatNumber(area)} square units.',
           why:
               'A rectangle can be divided into rows of equal unit squares, so multiplying length by width counts the total squares.',
         ),
@@ -3906,7 +3906,7 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
       answer: _formatNumber(area),
       methodSummary:
           'Multiply length by width for area, and use 2(length + width) for perimeter.',
-      example: 'Rectangle 8 by 5 → area 40 square units',
+      example: 'Rectangle 8 by 5 â†’ area 40 square units',
       supported: true,
     );
   }
@@ -3932,21 +3932,21 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
         TutorStepData(
           title: 'Use the area formula',
           body:
-              'Area = πr² = π × ${_formatNumber(r)} × ${_formatNumber(r)} ≈ ${_formatNumber(area)} square units.',
+              'Area = Ï€rÂ² = Ï€ Ã— ${_formatNumber(r)} Ã— ${_formatNumber(r)} â‰ˆ ${_formatNumber(area)} square units.',
           why:
-              'The area formula πr² measures the surface enclosed by the circle.',
+              'The area formula Ï€rÂ² measures the surface enclosed by the circle.',
         ),
         TutorStepData(
           title: 'Related circumference check',
-          body: 'Circumference = 2πr ≈ ${_formatNumber(circumference)} units.',
+          body: 'Circumference = 2Ï€r â‰ˆ ${_formatNumber(circumference)} units.',
           why:
               'This provides a related measurement around the boundary and helps keep the radius meaning clear.',
         ),
       ],
       answer: _formatNumber(area),
       methodSummary:
-          'Square the radius, multiply by π, then check the units. For circumference use 2πr.',
-      example: 'Circle radius 7 → area ≈ 153.94 square units',
+          'Square the radius, multiply by Ï€, then check the units. For circumference use 2Ï€r.',
+      example: 'Circle radius 7 â†’ area â‰ˆ 153.94 square units',
       supported: true,
     );
   }
@@ -3982,7 +3982,7 @@ TutorSolution? _advancedTutorPatterns(String cleaned, String expression) {
         steps: [
           TutorStepData(
             title: 'Identify the units',
-            body: '${_formatNumber(amount)} $from → $to',
+            body: '${_formatNumber(amount)} $from â†’ $to',
             why:
                 'A conversion changes the unit label while keeping the physical quantity the same.',
           ),
@@ -4057,7 +4057,7 @@ TutorSolution solveTutorQuestion(String question) {
         TutorStepData(
           title: 'Find the percentage amount',
           body:
-              '$pText% of $baseText = $pText ÷ 100 × $baseText = ${_formatNumber(delta)}.',
+              '$pText% of $baseText = $pText Ã· 100 Ã— $baseText = ${_formatNumber(delta)}.',
           why:
               'We first calculate the size of the change itself. This is the amount that will be added or removed.',
         ),
@@ -4113,13 +4113,13 @@ TutorSolution solveTutorQuestion(String question) {
           ),
           TutorStepData(
             title: 'Write the fraction',
-            body: '$partText ÷ $wholeText = ${_formatNumber(part / whole)}.',
+            body: '$partText Ã· $wholeText = ${_formatNumber(part / whole)}.',
             why:
                 'Dividing part by whole tells us what fraction of the whole the part represents.',
           ),
           TutorStepData(
             title: 'Convert the fraction to a percentage',
-            body: '${_formatNumber(part / whole)} × 100 = $answerText%.',
+            body: '${_formatNumber(part / whole)} Ã— 100 = $answerText%.',
             why:
                 'Multiplying by 100 changes the fraction into the equivalent number of parts out of 100.',
           ),
@@ -4133,7 +4133,7 @@ TutorSolution solveTutorQuestion(String question) {
         answer: '$answerText%',
         methodSummary:
             'Divide the part by the whole, then multiply by 100 to express the relationship as a percentage.',
-        example: '20 is what percent of 80? → 25%',
+        example: '20 is what percent of 80? â†’ 25%',
         supported: true,
       );
     }
@@ -4180,13 +4180,13 @@ TutorSolution solveTutorQuestion(String question) {
           ),
           TutorStepData(
             title: 'Divide the total by the count',
-            body: '${_formatNumber(sum)} ÷ ${nums.length} = $resultText.',
+            body: '${_formatNumber(sum)} Ã· ${nums.length} = $resultText.',
             why:
                 'Dividing the total equally gives the value that represents the center of the data set.',
           ),
         ],
         answer: resultText,
-        methodSummary: 'Mean = total of all values ÷ number of values.',
+        methodSummary: 'Mean = total of all values Ã· number of values.',
         example: 'Average of 10, 20, 30 = 20',
         supported: true,
       );
@@ -4225,7 +4225,7 @@ TutorSolution solveTutorQuestion(String question) {
           TutorStepData(
             title: 'Use cross multiplication',
             body:
-                '$a × $dToken = $b × $cToken.\nThen isolate x by dividing by the remaining known factor.\n\nx = $xText.',
+                '$a Ã— $dToken = $b Ã— $cToken.\nThen isolate x by dividing by the remaining known factor.\n\nx = $xText.',
             why:
                 'Cross multiplication creates two equal products. This lets us turn the ratio relationship into a simple equation that can be solved.',
           ),
@@ -4240,7 +4240,7 @@ TutorSolution solveTutorQuestion(String question) {
         answer: 'x = $xText',
         methodSummary:
             'Use cross multiplication to turn the proportion into an equation, isolate x, and verify the ratio.',
-        example: '2:3 = x:12 → x = 8',
+        example: '2:3 = x:12 â†’ x = 8',
         supported: true,
       );
     }
@@ -4266,17 +4266,17 @@ TutorSolution solveTutorQuestion(String question) {
           title: 'Understand the question',
           body: 'We need to find $pText% of $baseText.',
           why:
-              'The word “of” means we are taking that percentage of the whole amount.',
+              'The word â€œofâ€ means we are taking that percentage of the whole amount.',
         ),
         TutorStepData(
           title: 'Convert the percent to a decimal',
-          body: '$pText% = $pText ÷ 100 = ${_formatNumber(p / 100)}.',
+          body: '$pText% = $pText Ã· 100 = ${_formatNumber(p / 100)}.',
           why:
-              'A percent means “out of 100”, so dividing by 100 changes the percentage into a decimal multiplier.',
+              'A percent means â€œout of 100â€, so dividing by 100 changes the percentage into a decimal multiplier.',
         ),
         TutorStepData(
           title: 'Multiply by the whole amount',
-          body: '${_formatNumber(p / 100)} × $baseText = $answerText.',
+          body: '${_formatNumber(p / 100)} Ã— $baseText = $answerText.',
           why:
               'Multiplying the whole amount by the decimal percentage finds exactly that fraction of the whole.',
         ),
@@ -4333,10 +4333,10 @@ TutorSolution solveTutorQuestion(String question) {
             '${a.display} - ${b.display}\n= $leftNumerator/$commonDenominator - $rightNumerator/$commonDenominator\n= ${(leftNumerator - rightNumerator)}/$commonDenominator\n= ${result.display}';
       } else if (op == '*') {
         working =
-            '${a.display} × ${b.display}\n= ${a.numerator} × ${b.numerator} / (${a.denominator} × ${b.denominator})\n= ${result.display}';
+            '${a.display} Ã— ${b.display}\n= ${a.numerator} Ã— ${b.numerator} / (${a.denominator} Ã— ${b.denominator})\n= ${result.display}';
       } else {
         working =
-            '${a.display} ÷ ${b.display}\n= ${a.numerator}/${a.denominator} × ${b.denominator}/${b.numerator}\n= ${result.display}';
+            '${a.display} Ã· ${b.display}\n= ${a.numerator}/${a.denominator} Ã— ${b.denominator}/${b.numerator}\n= ${result.display}';
       }
       return TutorSolution(
         question: cleaned,
@@ -4383,8 +4383,8 @@ TutorSolution solveTutorQuestion(String question) {
             : op == '-'
                 ? '3/4 - 1/4 = 1/2'
                 : op == '*'
-                    ? '2/3 × 3/4 = 1/2'
-                    : '1/2 ÷ 1/4 = 2',
+                    ? '2/3 Ã— 3/4 = 1/2'
+                    : '1/2 Ã· 1/4 = 2',
         supported: true,
       );
     }
@@ -4433,7 +4433,7 @@ TutorSolution solveTutorQuestion(String question) {
           TutorStepData(
             title: 'Divide by the coefficient of x',
             body:
-                'Divide both sides by ${_formatNumber(a)}:\n\nx = ${_formatNumber(isolateValue)} ÷ ${_formatNumber(a)}\n\nx = $xText',
+                'Divide both sides by ${_formatNumber(a)}:\n\nx = ${_formatNumber(isolateValue)} Ã· ${_formatNumber(a)}\n\nx = $xText',
             why:
                 'Multiplication by a is undone by division by a. This leaves x by itself without changing the balance.',
           ),
@@ -4448,7 +4448,7 @@ TutorSolution solveTutorQuestion(String question) {
         answer: 'x = $xText',
         methodSummary:
             'For a simple linear equation, isolate the term containing x, then undo its coefficient by dividing, and finally check the value by substitution.',
-        example: '2x + 5 = 15 → x = 5',
+        example: '2x + 5 = 15 â†’ x = 5',
         supported: true,
       );
     }
@@ -4505,7 +4505,7 @@ TutorSolution solveTutorQuestion(String question) {
         answer: _formatNumber(advanced.value),
         methodSummary:
             'Use parentheses first, then multiplication/division, then addition/subtraction, and work left to right within each level.',
-        example: '2 + 3 × 4 = 14',
+        example: '2 + 3 Ã— 4 = 14',
         supported: true,
       );
     }
@@ -4566,7 +4566,7 @@ TutorSolution solveTutorQuestion(String question) {
       ],
       answer: 'Undefined',
       methodSummary: 'Before dividing, check that the divisor is not zero.',
-      example: '8 ÷ 2 = 4',
+      example: '8 Ã· 2 = 4',
       supported: true,
     );
   }
@@ -4584,7 +4584,7 @@ TutorSolution solveTutorQuestion(String question) {
     final places = _max(leftPlaces, rightPlaces);
     final l = _padDecimal(leftText, places);
     final r = _padDecimal(rightText, places);
-    final aligned = '  $l\n+ $r\n──────\n$resultText';
+    final aligned = '  $l\n+ $r\nâ”€â”€â”€â”€â”€â”€\n$resultText';
     return TutorSolution(
       question: cleaned,
       topic: isDecimal ? 'Decimal Addition' : 'Addition',
@@ -4603,7 +4603,7 @@ TutorSolution solveTutorQuestion(String question) {
               ? 'Write equal place values in the same columns. If needed, add trailing zeros without changing the value.\n\n$aligned'
               : 'Place ones under ones, tens under tens, and so on:\n\n$leftText\n+ $rightText',
           why: isDecimal
-              ? 'A trailing zero does not change a decimal’s value. It simply makes the tenths and hundredths columns visible so equal-sized units can be added together.'
+              ? 'A trailing zero does not change a decimalâ€™s value. It simply makes the tenths and hundredths columns visible so equal-sized units can be added together.'
               : 'Every digit has a place value. Matching columns keep equal-sized units together.',
         ),
         TutorStepData(
@@ -4617,7 +4617,7 @@ TutorSolution solveTutorQuestion(String question) {
         TutorStepData(
           title: 'Write and check the answer',
           body:
-              '$l\n+ $r\n──────\n$resultText\n\nEstimate the size first, then compare it with the exact result.',
+              '$l\n+ $r\nâ”€â”€â”€â”€â”€â”€\n$resultText\n\nEstimate the size first, then compare it with the exact result.',
           why:
               'A check catches common mistakes such as a missed carry, wrong column, or misplaced decimal point.',
         ),
@@ -4635,7 +4635,7 @@ TutorSolution solveTutorQuestion(String question) {
     final places = _max(leftPlaces, rightPlaces);
     final l = _padDecimal(leftText, places);
     final r = _padDecimal(rightText, places);
-    final aligned = '  $l\n- $r\n──────\n$resultText';
+    final aligned = '  $l\n- $r\nâ”€â”€â”€â”€â”€â”€\n$resultText';
     return TutorSolution(
       question: cleaned,
       topic: isDecimal ? 'Decimal Subtraction' : 'Subtraction',
@@ -4704,7 +4704,7 @@ TutorSolution solveTutorQuestion(String question) {
               ? 'Temporarily remove the decimal points'
               : 'Multiply the factors',
           body: isDecimal
-              ? 'Treat the factors as whole numbers: $wholeLeft × $wholeRight = $wholeProduct.'
+              ? 'Treat the factors as whole numbers: $wholeLeft Ã— $wholeRight = $wholeProduct.'
               : 'Multiply the digits and build the partial products according to place value.',
           why: isDecimal
               ? 'Whole-number multiplication is easier to perform first. We restore the decimal places afterward based on place value.'
@@ -4731,7 +4731,7 @@ TutorSolution solveTutorQuestion(String question) {
       methodSummary: isDecimal
           ? 'Multiply as whole numbers, count all decimal places in the original factors, restore the decimal point, and check the size.'
           : 'Multiply place values carefully, combine partial products, and check the size of the result.',
-      example: isDecimal ? '1.2 × 3.0 = 3.6' : '6 × 4 = 24',
+      example: isDecimal ? '1.2 Ã— 3.0 = 3.6' : '6 Ã— 4 = 24',
       supported: true,
     );
   }
@@ -4757,8 +4757,8 @@ TutorSolution solveTutorQuestion(String question) {
             ? 'Make the divisor a whole number'
             : 'Set up the division',
         body: movePlaces > 0
-            ? 'Move the decimal point $movePlaces place${movePlaces == 1 ? '' : 's'} in both numbers:\n$leftText ÷ $rightText becomes $adjustedLeft ÷ $adjustedRight.'
-            : 'Set up $leftText ÷ $rightText and work through the quotient one place at a time.',
+            ? 'Move the decimal point $movePlaces place${movePlaces == 1 ? '' : 's'} in both numbers:\n$leftText Ã· $rightText becomes $adjustedLeft Ã· $adjustedRight.'
+            : 'Set up $leftText Ã· $rightText and work through the quotient one place at a time.',
         why: movePlaces > 0
             ? 'Moving both decimal points the same number of places multiplies both numbers by the same power of 10, so the quotient stays the same.'
             : 'The quotient records how many equal groups of the divisor fit into the dividend.',
@@ -4766,13 +4766,13 @@ TutorSolution solveTutorQuestion(String question) {
       TutorStepData(
         title: 'Divide step-by-step',
         body:
-            '$adjustedLeft ÷ $adjustedRight = $resultText. Work through the quotient place by place, bringing down digits when necessary.',
+            '$adjustedLeft Ã· $adjustedRight = $resultText. Work through the quotient place by place, bringing down digits when necessary.',
         why:
             'Each quotient digit tells us how many groups fit into the current part of the dividend.',
       ),
       TutorStepData(
         title: 'Check by multiplying',
-        body: '$resultText × $rightText = ${_formatNumber(result * right)}.',
+        body: '$resultText Ã— $rightText = ${_formatNumber(result * right)}.',
         why:
             'Multiplication is the inverse of division, so it can confirm the quotient.',
       ),
@@ -4781,7 +4781,7 @@ TutorSolution solveTutorQuestion(String question) {
     methodSummary: isDecimal
         ? 'Make the divisor a whole number by moving both decimal points equally, divide, then check by multiplication.'
         : 'Divide one step at a time and confirm the quotient by multiplying it by the divisor.',
-    example: isDecimal ? '6.0 ÷ 1.5 = 4' : '24 ÷ 6 = 4',
+    example: isDecimal ? '6.0 Ã· 1.5 = 4' : '24 Ã· 6 = 4',
     supported: true,
   );
 }
@@ -4974,7 +4974,7 @@ class _QuestionResultScreenState extends State<QuestionResultScreen> {
             q.contains('step'))) {
       _lastAskedStep = requestedStep;
       final step = solution.steps[requestedStep - 1];
-      return 'Let’s use Step $requestedStep from your exact question.\n\n**What the step does:**\n${step.body}\n\n**Why we do it:**\n${step.why}\n\n**What changes after this step:**\nThe work becomes one smaller piece of the original problem, which makes the next step easier to perform and check.\n\nIf this is still unclear, tell me which word, number, carry, fraction, or operation is confusing you and I will break that exact part down again.';
+      return 'Letâ€™s use Step $requestedStep from your exact question.\n\n**What the step does:**\n${step.body}\n\n**Why we do it:**\n${step.why}\n\n**What changes after this step:**\nThe work becomes one smaller piece of the original problem, which makes the next step easier to perform and check.\n\nIf this is still unclear, tell me which word, number, carry, fraction, or operation is confusing you and I will break that exact part down again.';
     }
 
     if (q.contains('another') || q.contains('example')) {
@@ -5000,7 +5000,7 @@ class _QuestionResultScreenState extends State<QuestionResultScreen> {
         final p = double.parse(pText);
         final decimal = _formatNumber(p / 100);
         final answer = _formatNumber(double.parse(baseText) * p / 100);
-        return 'Let’s use your exact percentage question: $pText% of $baseText.\n\nA percent means “out of 100”. So $pText% means $pText out of 100.\n\nDivide $pText by 100:\n$pText ÷ 100 = $decimal.\n\nThen multiply the whole amount by that decimal:\n$decimal × $baseText = $answer.\n\nWhy do we do that? Because $pText% is the same as the fraction $pText/100. Multiplying by that fraction takes exactly that part of the whole amount.\n\nSo the answer is $answer, and the decimal conversion is what makes the percentage usable in a multiplication.';
+        return 'Letâ€™s use your exact percentage question: $pText% of $baseText.\n\nA percent means â€œout of 100â€. So $pText% means $pText out of 100.\n\nDivide $pText by 100:\n$pText Ã· 100 = $decimal.\n\nThen multiply the whole amount by that decimal:\n$decimal Ã— $baseText = $answer.\n\nWhy do we do that? Because $pText% is the same as the fraction $pText/100. Multiplying by that fraction takes exactly that part of the whole amount.\n\nSo the answer is $answer, and the decimal conversion is what makes the percentage usable in a multiplication.';
       }
     }
 
@@ -5021,15 +5021,15 @@ class _QuestionResultScreenState extends State<QuestionResultScreen> {
             final combined = op == '+'
                 ? leftNumerator + rightNumerator
                 : leftNumerator - rightNumerator;
-            return 'Let’s use your exact fractions: ${a.display} $op ${b.display}.\n\nFor addition or subtraction, the pieces must be the same size before we combine them. That is why we create a common denominator.\n\nUsing $common as a common denominator:\n${a.display} = $leftNumerator/$common\n${b.display} = $rightNumerator/$common\n\nNow both fractions describe pieces of the same size, so we can ${op == '+' ? 'add' : 'subtract'} the numerators:\n$leftNumerator $op $rightNumerator = $combined.\n\nThe denominator stays $common because the size of each piece did not change. Then we simplify the resulting fraction.\n\nThat is the reason for the common denominator — it makes the fractional pieces comparable.';
+            return 'Letâ€™s use your exact fractions: ${a.display} $op ${b.display}.\n\nFor addition or subtraction, the pieces must be the same size before we combine them. That is why we create a common denominator.\n\nUsing $common as a common denominator:\n${a.display} = $leftNumerator/$common\n${b.display} = $rightNumerator/$common\n\nNow both fractions describe pieces of the same size, so we can ${op == '+' ? 'add' : 'subtract'} the numerators:\n$leftNumerator $op $rightNumerator = $combined.\n\nThe denominator stays $common because the size of each piece did not change. Then we simplify the resulting fraction.\n\nThat is the reason for the common denominator â€” it makes the fractional pieces comparable.';
           }
           if (op == '*') {
             final result = _fractionMultiply(a, b);
-            return 'For ${a.display} × ${b.display}, multiply the numerators and multiply the denominators:\n\n${a.numerator} × ${b.numerator} = ${a.numerator * b.numerator}\n${a.denominator} × ${b.denominator} = ${a.denominator * b.denominator}\n\nSo we get ${a.numerator * b.numerator}/${a.denominator * b.denominator}, which simplifies to ${result.display}.\n\nWhy? Multiplying fractions is combining a part of one quantity with a part of another.';
+            return 'For ${a.display} Ã— ${b.display}, multiply the numerators and multiply the denominators:\n\n${a.numerator} Ã— ${b.numerator} = ${a.numerator * b.numerator}\n${a.denominator} Ã— ${b.denominator} = ${a.denominator * b.denominator}\n\nSo we get ${a.numerator * b.numerator}/${a.denominator * b.denominator}, which simplifies to ${result.display}.\n\nWhy? Multiplying fractions is combining a part of one quantity with a part of another.';
           }
           if (op == '/') {
             final result = _fractionDivide(a, b);
-            return 'For ${a.display} ÷ ${b.display}, keep the first fraction, change division to multiplication, and flip the second fraction:\n\n${a.display} × ${b.denominator}/${b.numerator}\n\nThen multiply:\n${a.numerator} × ${b.denominator} / (${a.denominator} × ${b.numerator}) = ${result.display}.\n\nWhy? Dividing by a fraction asks how many groups of that fractional size fit into the first fraction. Multiplying by the reciprocal gives that number of groups.';
+            return 'For ${a.display} Ã· ${b.display}, keep the first fraction, change division to multiplication, and flip the second fraction:\n\n${a.display} Ã— ${b.denominator}/${b.numerator}\n\nThen multiply:\n${a.numerator} Ã— ${b.denominator} / (${a.denominator} Ã— ${b.numerator}) = ${result.display}.\n\nWhy? Dividing by a fraction asks how many groups of that fractional size fit into the first fraction. Multiplying by the reciprocal gives that number of groups.';
           }
         }
       }
@@ -5054,7 +5054,7 @@ class _QuestionResultScreenState extends State<QuestionResultScreen> {
         if (q.contains('divide') ||
             q.contains('coefficient') ||
             q.contains('2')) {
-          return 'Let’s use the exact equation from your question.\n\nThe coefficient of x is ${_formatNumber(a)}. After removing the constant, the equation becomes:\n${_formatNumber(a)}x = ${_formatNumber(isolate)}\n\nWe then divide both sides by ${_formatNumber(a)}:\n${_formatNumber(a)}x ÷ ${_formatNumber(a)} = ${_formatNumber(isolate)} ÷ ${_formatNumber(a)}\n\nx = ${_formatNumber(x)}.\n\nWhy? Multiplication by ${_formatNumber(a)} and division by ${_formatNumber(a)} are inverse operations. Dividing undoes the coefficient so x can stand by itself.\n\nFinally, substitute x = ${_formatNumber(x)} back into the original equation to make sure both sides are equal.';
+          return 'Letâ€™s use the exact equation from your question.\n\nThe coefficient of x is ${_formatNumber(a)}. After removing the constant, the equation becomes:\n${_formatNumber(a)}x = ${_formatNumber(isolate)}\n\nWe then divide both sides by ${_formatNumber(a)}:\n${_formatNumber(a)}x Ã· ${_formatNumber(a)} = ${_formatNumber(isolate)} Ã· ${_formatNumber(a)}\n\nx = ${_formatNumber(x)}.\n\nWhy? Multiplication by ${_formatNumber(a)} and division by ${_formatNumber(a)} are inverse operations. Dividing undoes the coefficient so x can stand by itself.\n\nFinally, substitute x = ${_formatNumber(x)} back into the original equation to make sure both sides are equal.';
         }
         return 'An equation is a balance. In your exact equation, we first remove the constant term so the x-term is by itself. Then we undo the coefficient by dividing both sides by the same number. We must perform the same operation on both sides so the balance is preserved.\n\nFor your question, that process leads to x = ${_formatNumber(x)} and substitution confirms the result.';
       }
@@ -5096,7 +5096,7 @@ class _QuestionResultScreenState extends State<QuestionResultScreen> {
 
 1. Whole-number part:
 $aWhole + $bWhole = $wholeSubtotal.
-That is only the whole-number subtotal — we are not finished yet.
+That is only the whole-number subtotal â€” we are not finished yet.
 
 2. Hundredths:
 $aHund + $bHund = $hundredSum.
@@ -5118,7 +5118,7 @@ Therefore the complete answer is **${solution.answer}**.
 
 The key idea is that the number did not randomly change. An extra whole was created from the decimal part through regrouping.''';
         }
-        return 'For your exact decimal question, decimal points line up because they keep equal place values together: ones under ones, tenths under tenths, and hundredths under hundredths. A digit changes its value when it moves to a different place, so aligning the decimal points protects the value of every digit.\n\nFor this problem:\n  $ap\n+ $bp\n──────\nThe decimal point stays in the same column while the digits are added.';
+        return 'For your exact decimal question, decimal points line up because they keep equal place values together: ones under ones, tenths under tenths, and hundredths under hundredths. A digit changes its value when it moves to a different place, so aligning the decimal points protects the value of every digit.\n\nFor this problem:\n  $ap\n+ $bp\nâ”€â”€â”€â”€â”€â”€\nThe decimal point stays in the same column while the digits are added.';
       }
     }
 
@@ -5129,10 +5129,10 @@ The key idea is that the number did not randomly change. An extra whole was crea
     if (q.contains('check') ||
         q.contains('correct') ||
         q.contains('right answer')) {
-      return "Let’s verify the exact lesson instead of trusting the final number.\n\n${solution.steps.asMap().entries.map((e) => 'Step ${e.key + 1}: ${e.value.title}\n${e.value.body}').join('\n\n')}\n\nFinal answer: ${solution.answer}\n\nThe key check is to use the inverse operation, substitution, estimation, or a place-value check appropriate to this topic.";
+      return "Letâ€™s verify the exact lesson instead of trusting the final number.\n\n${solution.steps.asMap().entries.map((e) => 'Step ${e.key + 1}: ${e.value.title}\n${e.value.body}').join('\n\n')}\n\nFinal answer: ${solution.answer}\n\nThe key check is to use the inverse operation, substitution, estimation, or a place-value check appropriate to this topic.";
     }
 
-    return 'I can explain this exact question, not just give a rule. Tell me the specific part you do not understand — for example, “Why did we carry 1?”, “Why did 15 become 16?”, “Why did we use a common denominator?”, or “Why did we divide by 2?”';
+    return 'I can explain this exact question, not just give a rule. Tell me the specific part you do not understand â€” for example, â€œWhy did we carry 1?â€, â€œWhy did 15 become 16?â€, â€œWhy did we use a common denominator?â€, or â€œWhy did we divide by 2?â€';
   }
 
   String _practiceQuestionFor(TutorSolution solution) {
@@ -5143,18 +5143,18 @@ The key idea is that the number did not randomly change. An extra whole was crea
     if (topic.contains('fraction') && topic.contains('subtraction'))
       return '3/4 - 1/4';
     if (topic.contains('fraction') && topic.contains('multiplication'))
-      return '2/3 × 3/4';
+      return '2/3 Ã— 3/4';
     if (topic.contains('fraction') && topic.contains('division'))
-      return '1/2 ÷ 1/4';
+      return '1/2 Ã· 1/4';
     if (topic.contains('algebra')) return '2x + 5 = 15';
     if (topic.contains('decimal addition')) return '4.50 + 2.25';
     if (topic.contains('decimal subtraction')) return '8.40 - 3.25';
-    if (topic.contains('decimal multiplication')) return '1.2 × 3.0';
-    if (topic.contains('decimal division')) return '6.0 ÷ 1.5';
+    if (topic.contains('decimal multiplication')) return '1.2 Ã— 3.0';
+    if (topic.contains('decimal division')) return '6.0 Ã· 1.5';
     if (topic.contains('addition')) return '23 + 15';
     if (topic.contains('subtraction')) return '42 - 17';
-    if (topic.contains('multiplication')) return '6 × 4';
-    if (topic.contains('division')) return '24 ÷ 6';
+    if (topic.contains('multiplication')) return '6 Ã— 4';
+    if (topic.contains('division')) return '24 Ã· 6';
     return solution.example;
   }
 
@@ -5206,7 +5206,7 @@ The key idea is that the number did not randomly change. An extra whole was crea
     }
     final firstStep = solution.steps.isNotEmpty ? solution.steps.first : null;
     final secondStep = solution.steps.length > 1 ? solution.steps[1] : null;
-    return 'Let’s rebuild this lesson in a different way.\n\n'
+    return 'Letâ€™s rebuild this lesson in a different way.\n\n'
         '1. Say the question in your own words.\n'
         '${firstStep == null ? '' : '2. Start with: ${firstStep.title}.\n${firstStep.body}\n\nWhy? ${firstStep.why}\n\n'}'
         '${secondStep == null ? '' : '3. Then move to: ${secondStep.title}.\n${secondStep.body}\n\nWhy? ${secondStep.why}\n\n'}'
@@ -5275,7 +5275,7 @@ The key idea is that the number did not randomly change. An extra whole was crea
                           color: Color(0xFF14213D))),
                   const SizedBox(height: 7),
                   const Text(
-                      'Understand → Learn the method → Work each step → Understand why → Check → Practice',
+                      'Understand â†’ Learn the method â†’ Work each step â†’ Understand why â†’ Check â†’ Practice',
                       style: TextStyle(color: Color(0xFF53637A), height: 1.45)),
                 ],
               ),
@@ -5366,7 +5366,7 @@ The key idea is that the number did not randomly change. An extra whole was crea
             _ResultCard(
               title: solution.supported
                   ? 'Detailed step-by-step lesson'
-                  : 'Let’s clarify the question',
+                  : 'Letâ€™s clarify the question',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -5417,7 +5417,7 @@ The key idea is that the number did not randomly change. An extra whole was crea
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                      'Tell TutorAI exactly what is confusing you. It will not simply repeat the same answer — it will change the teaching approach and go deeper.',
+                      'Tell TutorAI exactly what is confusing you. It will not simply repeat the same answer â€” it will change the teaching approach and go deeper.',
                       style: TextStyle(color: Color(0xFF5E6D81), height: 1.45)),
                   const SizedBox(height: 10),
                   Wrap(
@@ -5452,8 +5452,8 @@ The key idea is that the number did not randomly change. An extra whole was crea
                     const SizedBox(height: 10),
                     Text(
                       _understandingStatus == 'understand'
-                          ? '✅ Great. Let’s prove it with a short practice question.'
-                          : '💡 No problem. I have added a deeper explanation. You can keep asking until it is clear.',
+                          ? 'âœ… Great. Letâ€™s prove it with a short practice question.'
+                          : 'ðŸ’¡ No problem. I have added a deeper explanation. You can keep asking until it is clear.',
                       style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF2C4D78)),
@@ -5469,7 +5469,7 @@ The key idea is that the number did not randomly change. An extra whole was crea
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                      'Write the exact part that is confusing you. For example: “Why did 15 become 16?”, “Why do I need a common denominator?”, or “Why did we divide by 2?”',
+                      'Write the exact part that is confusing you. For example: â€œWhy did 15 become 16?â€, â€œWhy do I need a common denominator?â€, or â€œWhy did we divide by 2?â€',
                       style: TextStyle(color: Color(0xFF5E6D81), height: 1.45)),
                   const SizedBox(height: 10),
                   TextField(
@@ -5594,7 +5594,7 @@ The key idea is that the number did not randomly change. An extra whole was crea
             ),
             const SizedBox(height: 14),
             _ResultCard(
-              title: 'Practice — show me you understand',
+              title: 'Practice â€” show me you understand',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -5698,7 +5698,7 @@ The key idea is that the number did not randomly change. An extra whole was crea
                         ),
                       );
                     },
-                    child: const Text('Practice Below →'),
+                    child: const Text('Practice Below â†’'),
                   ),
                 ),
               ],
@@ -6486,7 +6486,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
         question: 'What is 20% of 150?',
         options: <String>['20', '25', '30', '35'],
         answer: '30',
-        explanation: '20% means 20 ÷ 100. So 20/100 × 150 = 30.',
+        explanation: '20% means 20 Ã· 100. So 20/100 Ã— 150 = 30.',
       ),
       _PracticeQuestion(
         subject: 'Mathematics',
@@ -6500,11 +6500,11 @@ class _PracticeScreenState extends State<PracticeScreen> {
       _PracticeQuestion(
         subject: 'Mathematics',
         topic: 'Order of Operations',
-        question: 'Calculate: 6 + 4 × 2',
+        question: 'Calculate: 6 + 4 Ã— 2',
         options: <String>['14', '20', '16', '12'],
         answer: '14',
         explanation:
-            'Multiplication comes before addition, so 4 × 2 = 8, then 6 + 8 = 14.',
+            'Multiplication comes before addition, so 4 Ã— 2 = 8, then 6 + 8 = 14.',
       ),
     ],
     'Science': <_PracticeQuestion>[
@@ -6575,34 +6575,34 @@ class _PracticeScreenState extends State<PracticeScreen> {
         ],
         answer: 'She goes to school every day.',
         explanation:
-            'With the singular subject “She” in the simple present tense, the verb takes -s: “goes.”',
+            'With the singular subject â€œSheâ€ in the simple present tense, the verb takes -s: â€œgoes.â€',
       ),
       _PracticeQuestion(
         subject: 'English',
         topic: 'Vocabulary',
-        question: 'What is the closest meaning of “rapid”?',
+        question: 'What is the closest meaning of â€œrapidâ€?',
         options: <String>['Slow', 'Quick', 'Quiet', 'Heavy'],
         answer: 'Quick',
-        explanation: '“Rapid” means happening or moving quickly.',
+        explanation: 'â€œRapidâ€ means happening or moving quickly.',
       ),
       _PracticeQuestion(
         subject: 'English',
         topic: 'Parts of Speech',
         question:
-            'In “The bright student smiled,” which word is the adjective?',
+            'In â€œThe bright student smiled,â€ which word is the adjective?',
         options: <String>['The', 'bright', 'student', 'smiled'],
         answer: 'bright',
         explanation:
-            '“Bright” describes the noun “student,” so it is the adjective.',
+            'â€œBrightâ€ describes the noun â€œstudent,â€ so it is the adjective.',
       ),
       _PracticeQuestion(
         subject: 'English',
         topic: 'Grammar',
-        question: 'Choose the correct past tense of “write.”',
+        question: 'Choose the correct past tense of â€œwrite.â€',
         options: <String>['Writed', 'Written', 'Wrote', 'Writing'],
         answer: 'Wrote',
         explanation:
-            'The simple past tense of “write” is “wrote.” “Written” is the past participle.',
+            'The simple past tense of â€œwriteâ€ is â€œwrote.â€ â€œWrittenâ€ is the past participle.',
       ),
       _PracticeQuestion(
         subject: 'English',
@@ -6713,15 +6713,15 @@ class _PracticeScreenState extends State<PracticeScreen> {
   bool _answersMatch(String entered, String expected) {
     final cleanEntered = entered
         .trim()
-        .replaceAll('×', '*')
-        .replaceAll('÷', '/')
+        .replaceAll('Ã—', '*')
+        .replaceAll('Ã·', '/')
         .replaceAll(',', '')
         .replaceAll(' ', '')
         .toLowerCase();
     final cleanExpected = expected
         .trim()
-        .replaceAll('×', '*')
-        .replaceAll('÷', '/')
+        .replaceAll('Ã—', '*')
+        .replaceAll('Ã·', '/')
         .replaceAll(',', '')
         .replaceAll(' ', '')
         .toLowerCase();
@@ -6827,7 +6827,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
     required bool correct,
   }) {
     if (correct) {
-      return '✅ Correct!\n\n'
+      return 'âœ… Correct!\n\n'
           'Why your answer is correct:\n'
           '${question.explanation}\n\n'
           'Key idea:\n'
@@ -6836,7 +6836,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
           'Before moving on, explain the key idea in your own words. That helps turn the answer into understanding.';
     }
 
-    return '📘 Let’s learn from it.\n\n'
+    return 'ðŸ“˜ Letâ€™s learn from it.\n\n'
         'Your answer:\n'
         '$entered\n\n'
         'Correct answer:\n'
@@ -7012,7 +7012,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                           fontWeight: FontWeight.w900,
                           color: Color(0xFF14213D))),
                   const SizedBox(height: 4),
-                  const Text('5 questions • instant marking',
+                  const Text('5 questions â€¢ instant marking',
                       style: TextStyle(color: Color(0xFF66758A), fontSize: 13)),
                 ],
               ),
@@ -7205,7 +7205,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
               Icon(_correct ? Icons.check_circle_rounded : Icons.info_rounded,
                   color: foreground),
               const SizedBox(width: 9),
-              Text(_correct ? 'Correct' : 'Let’s learn from it',
+              Text(_correct ? 'Correct' : 'Letâ€™s learn from it',
                   style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
@@ -7273,7 +7273,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                           fontWeight: FontWeight.w900,
                           color: Color(0xFF2563EB))),
                   const SizedBox(height: 5),
-                  Text('$percent% • ${_selectedSubject ?? 'Practice'}',
+                  Text('$percent% â€¢ ${_selectedSubject ?? 'Practice'}',
                       style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
@@ -7320,24 +7320,25 @@ class _PracticeScreenState extends State<PracticeScreen> {
 class AchievementsScreen extends StatelessWidget {
   const AchievementsScreen({super.key});
 
-  String _dateKey(DateTime date) {
-    return '\${date.year}-\${date.month}-\${date.day}';
+  DateTime _weekStart(DateTime date) {
+    final day = DateTime(date.year, date.month, date.day);
+    return day.subtract(Duration(days: day.weekday - 1));
   }
 
   int _currentStreak(List<_ProgressSession> sessions) {
     if (sessions.isEmpty) return 0;
 
     final dates = sessions
-        .map((session) => DateTime(
-              session.completedAt.year,
-              session.completedAt.month,
-              session.completedAt.day,
-            ))
+        .map(
+          (session) => DateTime(
+            session.completedAt.year,
+            session.completedAt.month,
+            session.completedAt.day,
+          ),
+        )
         .toSet()
         .toList()
       ..sort((a, b) => b.compareTo(a));
-
-    if (dates.isEmpty) return 0;
 
     final today = DateTime(
       DateTime.now().year,
@@ -7369,11 +7370,13 @@ class AchievementsScreen extends StatelessWidget {
     if (sessions.isEmpty) return 0;
 
     final dates = sessions
-        .map((session) => DateTime(
-              session.completedAt.year,
-              session.completedAt.month,
-              session.completedAt.day,
-            ))
+        .map(
+          (session) => DateTime(
+            session.completedAt.year,
+            session.completedAt.month,
+            session.completedAt.day,
+          ),
+        )
         .toSet()
         .toList()
       ..sort();
@@ -7386,7 +7389,67 @@ class AchievementsScreen extends StatelessWidget {
 
       if (gap == 1) {
         current++;
-        if (current > longest) longest = current;
+        if (current > longest) {
+          longest = current;
+        }
+      } else {
+        current = 1;
+      }
+    }
+
+    return longest;
+  }
+
+  int _currentWeeklyStreak(List<_ProgressSession> sessions) {
+    if (sessions.isEmpty) return 0;
+
+    final weeks = sessions
+        .map((session) => _weekStart(session.completedAt))
+        .toSet()
+        .toList()
+      ..sort((a, b) => b.compareTo(a));
+
+    final currentWeek = _weekStart(DateTime.now());
+    final mostRecent = weeks.first;
+    final weekGap = currentWeek.difference(mostRecent).inDays ~/ 7;
+
+    if (weekGap > 1) return 0;
+
+    int streak = 1;
+
+    for (int i = 1; i < weeks.length; i++) {
+      final gap = weeks[i - 1].difference(weeks[i]).inDays;
+
+      if (gap == 7) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  }
+
+  int _longestWeeklyStreak(List<_ProgressSession> sessions) {
+    if (sessions.isEmpty) return 0;
+
+    final weeks = sessions
+        .map((session) => _weekStart(session.completedAt))
+        .toSet()
+        .toList()
+      ..sort();
+
+    int longest = 1;
+    int current = 1;
+
+    for (int i = 1; i < weeks.length; i++) {
+      final gap = weeks[i].difference(weeks[i - 1]).inDays;
+
+      if (gap == 7) {
+        current++;
+        if (current > longest) {
+          longest = current;
+        }
       } else {
         current = 1;
       }
@@ -7400,162 +7463,370 @@ class AchievementsScreen extends StatelessWidget {
     return AnimatedBuilder(
       animation: tutorProgress,
       builder: (context, _) {
-        final sessions = tutorProgress.sessions;
-        final totalQuestions = tutorProgress.totalQuestions;
-        final totalCorrect = tutorProgress.totalCorrect;
-        final accuracy = tutorProgress.accuracy;
-        final practiceSessions = tutorProgress.practiceSessions;
-        final currentStreak = _currentStreak(sessions);
-        final longestStreak = _longestStreak(sessions);
+        return AnimatedBuilder(
+          animation: studyPlanStore,
+          builder: (context, _) {
+            final sessions = tutorProgress.sessions;
+            final totalQuestions = tutorProgress.totalQuestions;
+            final accuracy = tutorProgress.accuracy;
+            final practiceSessions = tutorProgress.practiceSessions;
 
-        final earnedBadges = <Map<String, dynamic>>[
-          {
-            'title': 'First Step',
-            'description': 'Complete your first practice session.',
-            'icon': Icons.flag_rounded,
-            'earned': practiceSessions >= 1,
-          },
-          {
-            'title': 'Getting Serious',
-            'description': 'Complete 5 practice sessions.',
-            'icon': Icons.local_fire_department_rounded,
-            'earned': practiceSessions >= 5,
-          },
-          {
-            'title': 'Question Crusher',
-            'description': 'Answer 100 practice questions.',
-            'icon': Icons.psychology_rounded,
-            'earned': totalQuestions >= 100,
-          },
-          {
-            'title': 'Perfect Score',
-            'description': 'Finish a practice session with 100% accuracy.',
-            'icon': Icons.star_rounded,
-            'earned': sessions.any(
-              (session) =>
-                  session.total > 0 && session.correct == session.total,
-            ),
-          },
-          {
-            'title': '7-Day Streak',
-            'description': 'Study on 7 consecutive days.',
-            'icon': Icons.calendar_today_rounded,
-            'earned': longestStreak >= 7,
-          },
-          {
-            'title': 'Mastery',
-            'description': 'Reach at least 90% overall accuracy.',
-            'icon': Icons.workspace_premium_rounded,
-            'earned': totalQuestions > 0 && accuracy >= 90,
-          },
-        ];
+            final currentStreak = _currentStreak(sessions);
+            final longestStreak = _longestStreak(sessions);
+            final currentWeeklyStreak = _currentWeeklyStreak(sessions);
+            final longestWeeklyStreak =
+                _longestWeeklyStreak(sessions);
 
-        final earnedCount =
-            earnedBadges.where((badge) => badge['earned'] == true).length;
+            final plans = studyPlanStore.plans;
+            final planCount = plans.length;
+            final completedPlans = plans
+                .where(
+                  (plan) =>
+                      plan.totalTasks > 0 &&
+                      plan.completedTasks == plan.totalTasks,
+                )
+                .length;
 
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Achievements & Streaks'),
-            centerTitle: true,
-          ),
-          body: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  color: Theme.of(context).colorScheme.primaryContainer,
+            final earnedBadges = <Map<String, dynamic>>[
+              {
+                'title': 'First Step',
+                'description': 'Complete your first practice session.',
+                'icon': Icons.flag_rounded,
+                'earned': practiceSessions >= 1,
+              },
+              {
+                'title': 'Getting Serious',
+                'description': 'Complete 5 practice sessions.',
+                'icon': Icons.local_fire_department_rounded,
+                'earned': practiceSessions >= 5,
+              },
+              {
+                'title': 'Practice Pro',
+                'description': 'Complete 10 practice sessions.',
+                'icon': Icons.school_rounded,
+                'earned': practiceSessions >= 10,
+              },
+              {
+                'title': '25 Questions',
+                'description': 'Answer 25 practice questions.',
+                'icon': Icons.quiz_rounded,
+                'earned': totalQuestions >= 25,
+              },
+              {
+                'title': 'Question Crusher',
+                'description': 'Answer 100 practice questions.',
+                'icon': Icons.psychology_rounded,
+                'earned': totalQuestions >= 100,
+              },
+              {
+                'title': 'Question Marathon',
+                'description': 'Answer 250 practice questions.',
+                'icon': Icons.bolt_rounded,
+                'earned': totalQuestions >= 250,
+              },
+              {
+                'title': 'Perfect Score',
+                'description':
+                    'Finish a practice session with 100% accuracy.',
+                'icon': Icons.star_rounded,
+                'earned': sessions.any(
+                  (session) =>
+                      session.total > 0 &&
+                      session.correct == session.total,
                 ),
-                child: Column(
-                  children: [
-                    const Icon(
-                      Icons.local_fire_department_rounded,
-                      size: 52,
+              },
+              {
+                'title': '7-Day Streak',
+                'description': 'Study on 7 consecutive days.',
+                'icon': Icons.calendar_today_rounded,
+                'earned': longestStreak >= 7,
+              },
+              {
+                'title': '30-Day Streak',
+                'description': 'Study on 30 consecutive days.',
+                'icon': Icons.local_fire_department_rounded,
+                'earned': longestStreak >= 30,
+              },
+              {
+                'title': '4-Week Streak',
+                'description': 'Study across 4 consecutive weeks.',
+                'icon': Icons.date_range_rounded,
+                'earned': longestWeeklyStreak >= 4,
+              },
+              {
+                'title': 'Plan Starter',
+                'description': 'Create your first study plan.',
+                'icon': Icons.event_note_rounded,
+                'earned': planCount >= 1,
+              },
+              {
+                'title': 'Plan Finisher',
+                'description': 'Complete your first study plan.',
+                'icon': Icons.task_alt_rounded,
+                'earned': completedPlans >= 1,
+              },
+              {
+                'title': 'Plan Champion',
+                'description': 'Complete 3 study plans.',
+                'icon': Icons.workspace_premium_rounded,
+                'earned': completedPlans >= 3,
+              },
+              {
+                'title': 'Accuracy Ace',
+                'description': 'Reach at least 80% overall accuracy.',
+                'icon': Icons.track_changes_rounded,
+                'earned':
+                    totalQuestions > 0 && accuracy >= 80,
+              },
+              {
+                'title': 'Mastery',
+                'description': 'Reach at least 90% overall accuracy.',
+                'icon': Icons.emoji_events_rounded,
+                'earned':
+                    totalQuestions > 0 && accuracy >= 90,
+              },
+              {
+                'title': 'Precision',
+                'description': 'Reach at least 95% overall accuracy.',
+                'icon': Icons.auto_awesome_rounded,
+                'earned':
+                    totalQuestions > 0 && accuracy >= 95,
+              },
+            ];
+
+            final earnedCount =
+                earnedBadges.where(
+                  (badge) => badge['earned'] == true,
+                ).length;
+
+            String celebrationTitle;
+            String celebrationBody;
+
+            if (completedPlans >= 3) {
+              celebrationTitle = 'Study Plan Champion!';
+              celebrationBody =
+                  'You have completed 3 study plans. Keep building your learning momentum.';
+            } else if (longestWeeklyStreak >= 4) {
+              celebrationTitle = '4-Week Learning Streak!';
+              celebrationBody =
+                  'You have studied across four consecutive weeks.';
+            } else if (longestStreak >= 30) {
+              celebrationTitle = '30-Day Streak!';
+              celebrationBody =
+                  'A full month of consecutive study days is a major milestone.';
+            } else if (longestStreak >= 7) {
+              celebrationTitle = '7-Day Streak!';
+              celebrationBody =
+                  'You have built your first week-long study streak.';
+            } else if (accuracy >= 95 && totalQuestions > 0) {
+              celebrationTitle = '95% Accuracy!';
+              celebrationBody =
+                  'Your overall practice accuracy has reached 95%.';
+            } else if (totalQuestions >= 250) {
+              celebrationTitle = '250 Questions Completed!';
+              celebrationBody =
+                  'You have crossed the 250-question practice milestone.';
+            } else if (practiceSessions >= 10) {
+              celebrationTitle = '10 Practice Sessions!';
+              celebrationBody =
+                  'You have completed ten practice sessions.';
+            } else if (practiceSessions >= 1) {
+              celebrationTitle = 'Your Learning Journey Has Started!';
+              celebrationBody =
+                  'Every completed lesson and practice session moves you forward.';
+            } else {
+              celebrationTitle = 'Your Next Milestone Awaits';
+              celebrationBody =
+                  'Complete a practice session or create a study plan to unlock your first achievement.';
+            }
+
+            return Scaffold(
+              appBar: AppBar(
+                title: const Text('Achievements & Streaks'),
+                centerTitle: true,
+              ),
+              body: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      color:
+                          Theme.of(context).colorScheme.primaryContainer,
                     ),
-                    const SizedBox(height: 10),
-                    Text(
-                      '$currentStreak day streak',
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
+                    child: Column(
+                      children: [
+                        const Icon(
+                          Icons.local_fire_department_rounded,
+                          size: 52,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          '$currentStreak day streak',
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          currentStreak == 0
+                              ? 'Complete a practice session today to start your streak.'
+                              : 'Keep studying regularly to protect your streak.',
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TweenAnimationBuilder<double>(
+                    tween: Tween<double>(
+                      begin: 0.92,
+                      end: 1.0,
+                    ),
+                    duration: const Duration(milliseconds: 700),
+                    curve: Curves.easeOutBack,
+                    builder: (context, scale, child) {
+                      return Transform.scale(
+                        scale: scale,
+                        child: child,
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(22),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .secondaryContainer,
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.celebration_rounded,
+                            size: 42,
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  celebrationTitle,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(celebrationBody),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      currentStreak == 0
-                          ? 'Complete a practice session today to start your streak.'
-                          : 'Keep studying regularly to protect your streak.',
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: _AchievementStatCard(
-                      label: 'Best Streak',
-                      value: '$longestStreak days',
-                      icon: Icons.bolt_rounded,
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _AchievementStatCard(
+                          label: 'Best Daily',
+                          value: '$longestStreak days',
+                          icon: Icons.bolt_rounded,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _AchievementStatCard(
+                          label: 'Weekly Streak',
+                          value: '$currentWeeklyStreak weeks',
+                          icon: Icons.date_range_rounded,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _AchievementStatCard(
+                          label: 'Plans',
+                          value: '$planCount',
+                          icon: Icons.event_note_rounded,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _AchievementStatCard(
+                          label: 'Completed Plans',
+                          value: '$completedPlans',
+                          icon: Icons.task_alt_rounded,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _AchievementStatCard(
+                          label: 'Sessions',
+                          value: '$practiceSessions',
+                          icon: Icons.menu_book_rounded,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _AchievementStatCard(
+                          label: 'Accuracy',
+                          value: '$accuracy%',
+                          icon: Icons.track_changes_rounded,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Best weekly streak: $longestWeeklyStreak weeks',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _AchievementStatCard(
-                      label: 'Badges',
-                      value: '$earnedCount/${earnedBadges.length}',
-                      icon: Icons.emoji_events_rounded,
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Your Badges',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ...earnedBadges.map(
+                    (badge) => _AchievementBadgeCard(
+                      title: badge['title'] as String,
+                      description:
+                          badge['description'] as String,
+                      icon: badge['icon'] as IconData,
+                      earned: badge['earned'] as bool,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: _AchievementStatCard(
-                      label: 'Sessions',
-                      value: '$practiceSessions',
-                      icon: Icons.menu_book_rounded,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _AchievementStatCard(
-                      label: 'Accuracy',
-                      value: '$accuracy%',
-                      icon: Icons.track_changes_rounded,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Your Badges',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 10),
-              ...earnedBadges.map(
-                (badge) => _AchievementBadgeCard(
-                  title: badge['title'] as String,
-                  description: badge['description'] as String,
-                  icon: badge['icon'] as IconData,
-                  earned: badge['earned'] as bool,
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
   }
 }
-
 class _AchievementStatCard extends StatelessWidget {
   final String label;
   final String value;
@@ -9978,11 +10249,11 @@ class _ExamPrepScreenState extends State<ExamPrepScreen> {
       RegExp(r'\\text\{([^{}]*)\}'),
       r'$1',
     );
-    cleaned = cleaned.replaceAll(r'\times', '×');
-    cleaned = cleaned.replaceAll(r'\cdot', '×');
-    cleaned = cleaned.replaceAll(r'\div', '÷');
-    cleaned = cleaned.replaceAll(r'\pi', 'π');
-    cleaned = cleaned.replaceAll(r'\sqrt', '√');
+    cleaned = cleaned.replaceAll(r'\times', 'Ã—');
+    cleaned = cleaned.replaceAll(r'\cdot', 'Ã—');
+    cleaned = cleaned.replaceAll(r'\div', 'Ã·');
+    cleaned = cleaned.replaceAll(r'\pi', 'Ï€');
+    cleaned = cleaned.replaceAll(r'\sqrt', 'âˆš');
     cleaned = cleaned.replaceAll(r'\log', 'log');
     cleaned = cleaned.replaceAll(RegExp(r'\\([A-Za-z]+)'), r'$1');
 
@@ -10316,7 +10587,7 @@ Requirements:
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '$_selectedExam • $_selectedSubject',
+                          '$_selectedExam â€¢ $_selectedSubject',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w900,
@@ -10392,3 +10663,4 @@ class PlaceholderScreen extends StatelessWidget {
 List<BoxShadow> _softShadow() => const [
       BoxShadow(color: Color(0x1A22446B), blurRadius: 18, offset: Offset(0, 7))
     ];
+
