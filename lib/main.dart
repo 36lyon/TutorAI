@@ -7346,10 +7346,9 @@ class AchievementsScreen extends StatelessWidget {
       DateTime.now().day,
     );
 
-    final mostRecent = dates.first;
-    final daysSinceMostRecent = today.difference(mostRecent).inDays;
-
-    if (daysSinceMostRecent > 1) return 0;
+    if (today.difference(dates.first).inDays > 1) {
+      return 0;
+    }
 
     int streak = 1;
 
@@ -7410,10 +7409,10 @@ class AchievementsScreen extends StatelessWidget {
       ..sort((a, b) => b.compareTo(a));
 
     final currentWeek = _weekStart(DateTime.now());
-    final mostRecent = weeks.first;
-    final weekGap = currentWeek.difference(mostRecent).inDays ~/ 7;
 
-    if (weekGap > 1) return 0;
+    if (currentWeek.difference(weeks.first).inDays ~/ 7 > 1) {
+      return 0;
+    }
 
     int streak = 1;
 
@@ -7473,12 +7472,14 @@ class AchievementsScreen extends StatelessWidget {
 
             final currentStreak = _currentStreak(sessions);
             final longestStreak = _longestStreak(sessions);
-            final currentWeeklyStreak = _currentWeeklyStreak(sessions);
+            final currentWeeklyStreak =
+                _currentWeeklyStreak(sessions);
             final longestWeeklyStreak =
                 _longestWeeklyStreak(sessions);
 
             final plans = studyPlanStore.plans;
             final planCount = plans.length;
+
             final completedPlans = plans
                 .where(
                   (plan) =>
@@ -7487,40 +7488,46 @@ class AchievementsScreen extends StatelessWidget {
                 )
                 .length;
 
-            final earnedBadges = <Map<String, dynamic>>[
+            final badges = <Map<String, dynamic>>[
               {
                 'title': 'First Step',
-                'description': 'Complete your first practice session.',
+                'description':
+                    'Complete your first practice session.',
                 'icon': Icons.flag_rounded,
                 'earned': practiceSessions >= 1,
               },
               {
                 'title': 'Getting Serious',
-                'description': 'Complete 5 practice sessions.',
+                'description':
+                    'Complete 5 practice sessions.',
                 'icon': Icons.local_fire_department_rounded,
                 'earned': practiceSessions >= 5,
               },
               {
                 'title': 'Practice Pro',
-                'description': 'Complete 10 practice sessions.',
+                'description':
+                    'Complete 10 practice sessions.',
                 'icon': Icons.school_rounded,
                 'earned': practiceSessions >= 10,
               },
               {
                 'title': '25 Questions',
-                'description': 'Answer 25 practice questions.',
+                'description':
+                    'Answer 25 practice questions.',
                 'icon': Icons.quiz_rounded,
                 'earned': totalQuestions >= 25,
               },
               {
                 'title': 'Question Crusher',
-                'description': 'Answer 100 practice questions.',
+                'description':
+                    'Answer 100 practice questions.',
                 'icon': Icons.psychology_rounded,
                 'earned': totalQuestions >= 100,
               },
               {
                 'title': 'Question Marathon',
-                'description': 'Answer 250 practice questions.',
+                'description':
+                    'Answer 250 practice questions.',
                 'icon': Icons.bolt_rounded,
                 'earned': totalQuestions >= 250,
               },
@@ -7537,285 +7544,564 @@ class AchievementsScreen extends StatelessWidget {
               },
               {
                 'title': '7-Day Streak',
-                'description': 'Study on 7 consecutive days.',
+                'description':
+                    'Study on 7 consecutive days.',
                 'icon': Icons.calendar_today_rounded,
                 'earned': longestStreak >= 7,
               },
               {
                 'title': '30-Day Streak',
-                'description': 'Study on 30 consecutive days.',
+                'description':
+                    'Study on 30 consecutive days.',
                 'icon': Icons.local_fire_department_rounded,
                 'earned': longestStreak >= 30,
               },
               {
                 'title': '4-Week Streak',
-                'description': 'Study across 4 consecutive weeks.',
+                'description':
+                    'Study across 4 consecutive weeks.',
                 'icon': Icons.date_range_rounded,
                 'earned': longestWeeklyStreak >= 4,
               },
               {
                 'title': 'Plan Starter',
-                'description': 'Create your first study plan.',
+                'description':
+                    'Create your first study plan.',
                 'icon': Icons.event_note_rounded,
                 'earned': planCount >= 1,
               },
               {
                 'title': 'Plan Finisher',
-                'description': 'Complete your first study plan.',
+                'description':
+                    'Complete your first study plan.',
                 'icon': Icons.task_alt_rounded,
                 'earned': completedPlans >= 1,
               },
               {
                 'title': 'Plan Champion',
-                'description': 'Complete 3 study plans.',
+                'description':
+                    'Complete 3 study plans.',
                 'icon': Icons.workspace_premium_rounded,
                 'earned': completedPlans >= 3,
               },
               {
                 'title': 'Accuracy Ace',
-                'description': 'Reach at least 80% overall accuracy.',
+                'description':
+                    'Reach at least 80% overall accuracy.',
                 'icon': Icons.track_changes_rounded,
                 'earned':
                     totalQuestions > 0 && accuracy >= 80,
               },
               {
                 'title': 'Mastery',
-                'description': 'Reach at least 90% overall accuracy.',
+                'description':
+                    'Reach at least 90% overall accuracy.',
                 'icon': Icons.emoji_events_rounded,
                 'earned':
                     totalQuestions > 0 && accuracy >= 90,
               },
               {
                 'title': 'Precision',
-                'description': 'Reach at least 95% overall accuracy.',
+                'description':
+                    'Reach at least 95% overall accuracy.',
                 'icon': Icons.auto_awesome_rounded,
                 'earned':
                     totalQuestions > 0 && accuracy >= 95,
               },
             ];
 
-            final earnedCount =
-                earnedBadges.where(
-                  (badge) => badge['earned'] == true,
-                ).length;
+            final earnedCount = badges
+                .where((badge) => badge['earned'] == true)
+                .length;
+
+            final badgeProgress =
+                badges.isEmpty ? 0.0 : earnedCount / badges.length;
+
+            final nextBadge = badges.firstWhere(
+              (badge) => badge['earned'] != true,
+              orElse: () => <String, dynamic>{
+                'title': 'All Milestones Complete',
+                'description':
+                    'You have unlocked every current achievement.',
+                'icon': Icons.emoji_events_rounded,
+                'earned': true,
+              },
+            );
 
             String celebrationTitle;
             String celebrationBody;
 
             if (completedPlans >= 3) {
-              celebrationTitle = 'Study Plan Champion!';
+              celebrationTitle = 'Study Plan Champion';
               celebrationBody =
-                  'You have completed 3 study plans. Keep building your learning momentum.';
+                  'You have completed 3 study plans.';
             } else if (longestWeeklyStreak >= 4) {
-              celebrationTitle = '4-Week Learning Streak!';
+              celebrationTitle = 'Four Week Streak';
               celebrationBody =
                   'You have studied across four consecutive weeks.';
             } else if (longestStreak >= 30) {
-              celebrationTitle = '30-Day Streak!';
+              celebrationTitle = '30 Day Streak';
               celebrationBody =
-                  'A full month of consecutive study days is a major milestone.';
+                  'You have built a full month of consecutive study.';
             } else if (longestStreak >= 7) {
-              celebrationTitle = '7-Day Streak!';
+              celebrationTitle = '7 Day Streak';
               celebrationBody =
                   'You have built your first week-long study streak.';
             } else if (accuracy >= 95 && totalQuestions > 0) {
-              celebrationTitle = '95% Accuracy!';
+              celebrationTitle = '95% Accuracy';
               celebrationBody =
                   'Your overall practice accuracy has reached 95%.';
             } else if (totalQuestions >= 250) {
-              celebrationTitle = '250 Questions Completed!';
+              celebrationTitle = '250 Questions';
               celebrationBody =
-                  'You have crossed the 250-question practice milestone.';
+                  'You have crossed the 250-question milestone.';
             } else if (practiceSessions >= 10) {
-              celebrationTitle = '10 Practice Sessions!';
+              celebrationTitle = '10 Practice Sessions';
               celebrationBody =
                   'You have completed ten practice sessions.';
             } else if (practiceSessions >= 1) {
-              celebrationTitle = 'Your Learning Journey Has Started!';
+              celebrationTitle = 'Your Journey Has Started';
               celebrationBody =
-                  'Every completed lesson and practice session moves you forward.';
+                  'Every completed practice session moves you forward.';
             } else {
-              celebrationTitle = 'Your Next Milestone Awaits';
+              celebrationTitle = 'Your Next Milestone';
               celebrationBody =
-                  'Complete a practice session or create a study plan to unlock your first achievement.';
+                  'Complete a practice session or create a study plan.';
             }
 
             return Scaffold(
+              backgroundColor: const Color(0xFFF4F7FB),
               appBar: AppBar(
-                title: const Text('Achievements & Streaks'),
-                centerTitle: true,
+                title: const Text(
+                  'Achievements',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                backgroundColor: const Color(0xFFF4F7FB),
+                foregroundColor: const Color(0xFF14213D),
+                elevation: 0,
               ),
               body: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(
+                  16,
+                  4,
+                  16,
+                  32,
+                ),
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(22),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(24),
-                      color:
-                          Theme.of(context).colorScheme.primaryContainer,
+                      gradient: const LinearGradient(
+                        colors: [
+                          Color(0xFF102E6A),
+                          Color(0xFF2458C7),
+                          Color(0xFF3779E8),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x302563EB),
+                          blurRadius: 24,
+                          offset: Offset(0, 12),
+                        ),
+                      ],
                     ),
                     child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
                       children: [
-                        const Icon(
-                          Icons.local_fire_department_rounded,
-                          size: 52,
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'ACHIEVEMENT CENTER',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11,
+                                      letterSpacing: 1.3,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  SizedBox(height: 7),
+                                  Text(
+                                    'Keep your\nmomentum going.',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 27,
+                                      height: 1.05,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(
+                              width: 88,
+                              height: 88,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  CircularProgressIndicator(
+                                    value: badgeProgress,
+                                    strokeWidth: 8,
+                                    backgroundColor:
+                                        Colors.white24,
+                                    valueColor:
+                                        const AlwaysStoppedAnimation<
+                                          Color
+                                        >(Colors.white),
+                                  ),
+                                  Column(
+                                    mainAxisSize:
+                                        MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        '$earnedCount',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 23,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                      const Text(
+                                        'unlocked',
+                                        style: TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 10),
-                        Text(
-                          '$currentStreak day streak',
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
+                        const SizedBox(height: 24),
+                        Container(
+                          padding:
+                              const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                          decoration: BoxDecoration(
+                            color: Colors.white12,
+                            borderRadius:
+                                BorderRadius.circular(18),
+                            border: Border.all(
+                              color: Colors.white24,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          currentStreak == 0
-                              ? 'Complete a practice session today to start your streak.'
-                              : 'Keep studying regularly to protect your streak.',
-                          textAlign: TextAlign.center,
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.local_fire_department_rounded,
+                                color: Color(0xFFFFD54F),
+                                size: 30,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  '$currentStreak day streak',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                'Best $longestStreak',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 14),
-                  TweenAnimationBuilder<double>(
-                    tween: Tween<double>(
-                      begin: 0.92,
-                      end: 1.0,
-                    ),
-                    duration: const Duration(milliseconds: 700),
-                    curve: Curves.easeOutBack,
-                    builder: (context, scale, child) {
-                      return Transform.scale(
-                        scale: scale,
-                        child: child,
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(22),
-                        color: Theme.of(context)
-                            .colorScheme
-                            .secondaryContainer,
+
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: const Color(0xFFE3E9F2),
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.celebration_rounded,
-                            size: 42,
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  celebrationTitle,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(celebrationBody),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x0D22446B),
+                          blurRadius: 16,
+                          offset: Offset(0, 7),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFFE8F0FF),
+                                Color(0xFFDDE9FF),
                               ],
                             ),
+                            borderRadius:
+                                BorderRadius.circular(17),
                           ),
-                        ],
-                      ),
+                          child: Icon(
+                            nextBadge['icon'] as IconData,
+                            color: const Color(0xFF2563EB),
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(width: 13),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'NEXT MILESTONE',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  letterSpacing: 1.1,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF7B8798),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                nextBadge['title'] as String,
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF14213D),
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                nextBadge['description'] as String,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  height: 1.3,
+                                  color: Color(0xFF68778C),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _AchievementStatCard(
-                          label: 'Best Daily',
-                          value: '$longestStreak days',
-                          icon: Icons.bolt_rounded,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _AchievementStatCard(
-                          label: 'Weekly Streak',
-                          value: '$currentWeeklyStreak weeks',
-                          icon: Icons.date_range_rounded,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _AchievementStatCard(
-                          label: 'Plans',
-                          value: '$planCount',
-                          icon: Icons.event_note_rounded,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _AchievementStatCard(
-                          label: 'Completed Plans',
-                          value: '$completedPlans',
-                          icon: Icons.task_alt_rounded,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _AchievementStatCard(
-                          label: 'Sessions',
-                          value: '$practiceSessions',
-                          icon: Icons.menu_book_rounded,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _AchievementStatCard(
-                          label: 'Accuracy',
-                          value: '$accuracy%',
-                          icon: Icons.track_changes_rounded,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Best weekly streak: $longestWeeklyStreak weeks',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+
+                  const SizedBox(height: 18),
+
                   const Text(
-                    'Your Badges',
+                    'Your progress',
                     style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 21,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF14213D),
                     ),
                   ),
                   const SizedBox(height: 10),
-                  ...earnedBadges.map(
-                    (badge) => _AchievementBadgeCard(
-                      title: badge['title'] as String,
-                      description:
-                          badge['description'] as String,
-                      icon: badge['icon'] as IconData,
-                      earned: badge['earned'] as bool,
+
+                  GridView.count(
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
+                    physics:
+                        const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 1.32,
+                    children: [
+                      _PremiumAchievementMetric(
+                        value: '$currentStreak',
+                        label: 'Daily streak',
+                        icon:
+                            Icons.local_fire_department_rounded,
+                        iconColor:
+                            const Color(0xFFE59A00),
+                        background:
+                            const Color(0xFFFFF4DC),
+                      ),
+                      _PremiumAchievementMetric(
+                        value: '$currentWeeklyStreak',
+                        label: 'Weekly streak',
+                        icon: Icons.date_range_rounded,
+                        iconColor:
+                            const Color(0xFF2563EB),
+                        background:
+                            const Color(0xFFEAF2FF),
+                      ),
+                      _PremiumAchievementMetric(
+                        value: '$totalQuestions',
+                        label: 'Questions',
+                        icon: Icons.quiz_rounded,
+                        iconColor:
+                            const Color(0xFF18A875),
+                        background:
+                            const Color(0xFFE9F9F2),
+                      ),
+                      _PremiumAchievementMetric(
+                        value: '$accuracy%',
+                        label: 'Accuracy',
+                        icon:
+                            Icons.track_changes_rounded,
+                        iconColor:
+                            const Color(0xFF7C3AED),
+                        background:
+                            const Color(0xFFF0EAFF),
+                      ),
+                      _PremiumAchievementMetric(
+                        value: '$practiceSessions',
+                        label: 'Sessions',
+                        icon: Icons.menu_book_rounded,
+                        iconColor:
+                            const Color(0xFF1687C7),
+                        background:
+                            const Color(0xFFEAF7FF),
+                      ),
+                      _PremiumAchievementMetric(
+                        value: '$completedPlans',
+                        label: 'Plans done',
+                        icon: Icons.task_alt_rounded,
+                        iconColor:
+                            const Color(0xFF18A875),
+                        background:
+                            const Color(0xFFE9F9F2),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 22),
+
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF14213D),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.celebration_rounded,
+                          color: Color(0xFFFFD54F),
+                          size: 34,
+                        ),
+                        const SizedBox(width: 13),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                celebrationTitle,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                celebrationBody,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12.5,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Milestones',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF14213D),
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '$earnedCount/${badges.length}',
+                        style: const TextStyle(
+                          color: Color(0xFF6B7A90),
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  GridView.builder(
+                    itemCount: badges.length,
+                    shrinkWrap: true,
+                    physics:
+                        const NeverScrollableScrollPhysics(),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 0.98,
+                    ),
+                    itemBuilder: (context, index) {
+                      final badge = badges[index];
+
+                      return _PremiumAchievementBadge(
+                        title: badge['title'] as String,
+                        description:
+                            badge['description'] as String,
+                        icon: badge['icon'] as IconData,
+                        earned: badge['earned'] as bool,
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  Center(
+                    child: Text(
+                      'Best daily streak: $longestStreak days  •  '
+                      'Best weekly streak: $longestWeeklyStreak weeks',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF7B8798),
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
@@ -7827,42 +8113,75 @@ class AchievementsScreen extends StatelessWidget {
     );
   }
 }
-class _AchievementStatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
 
-  const _AchievementStatCard({
-    required this.label,
+class _PremiumAchievementMetric extends StatelessWidget {
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color iconColor;
+  final Color background;
+
+  const _PremiumAchievementMetric({
     required this.value,
+    required this.label,
     required this.icon,
+    required this.iconColor,
+    required this.background,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: Theme.of(context).dividerColor,
+          color: const Color(0xFFE3E9F2),
         ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0C22446B),
+            blurRadius: 14,
+            offset: Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 28),
-          const SizedBox(height: 8),
+          Container(
+            width: 43,
+            height: 43,
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              icon,
+              color: iconColor,
+              size: 22,
+            ),
+          ),
+          const Spacer(),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF14213D),
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             label,
-            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF7B8798),
+            ),
           ),
         ],
       ),
@@ -7870,13 +8189,13 @@ class _AchievementStatCard extends StatelessWidget {
   }
 }
 
-class _AchievementBadgeCard extends StatelessWidget {
+class _PremiumAchievementBadge extends StatelessWidget {
   final String title;
   final String description;
   final IconData icon;
   final bool earned;
 
-  const _AchievementBadgeCard({
+  const _PremiumAchievementBadge({
     required this.title,
     required this.description,
     required this.icon,
@@ -7888,13 +8207,7 @@ class _AchievementBadgeCard extends StatelessWidget {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Row(
-            children: [
-              Icon(earned ? icon : Icons.lock_outline_rounded),
-              const SizedBox(width: 10),
-              Expanded(child: Text(title)),
-            ],
-          ),
+          title: Text(title),
           content: Text(
             earned
                 ? '$description\n\nStatus: Earned'
@@ -7902,7 +8215,8 @@ class _AchievementBadgeCard extends StatelessWidget {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () =>
+                  Navigator.of(context).pop(),
               child: const Text('Close'),
             ),
           ],
@@ -7913,28 +8227,102 @@ class _AchievementBadgeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
+    final iconBackground = earned
+        ? const Color(0xFFEAF2FF)
+        : const Color(0xFFF0F3F7);
+
+    final iconColor = earned
+        ? const Color(0xFF2563EB)
+        : const Color(0xFF98A2B3);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
         onTap: () => _showDetails(context),
-        leading: CircleAvatar(
-          child: Icon(
-            earned ? icon : Icons.lock_outline_rounded,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: earned
+                  ? const Color(0x332563EB)
+                  : const Color(0xFFE3E9F2),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: earned
+                    ? const Color(0x122563EB)
+                    : const Color(0x0C22446B),
+                blurRadius: earned ? 16 : 12,
+                offset: const Offset(0, 7),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 47,
+                    height: 47,
+                    decoration: BoxDecoration(
+                      color: iconBackground,
+                      borderRadius:
+                          BorderRadius.circular(15),
+                    ),
+                    child: Icon(
+                      earned
+                          ? icon
+                          : Icons.lock_outline_rounded,
+                      color: iconColor,
+                      size: 23,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    earned
+                        ? Icons.check_circle_rounded
+                        : Icons.lock_outline_rounded,
+                    color: earned
+                        ? const Color(0xFF18A875)
+                        : const Color(0xFF98A2B3),
+                    size: 19,
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF14213D),
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                earned ? 'Earned' : 'Locked',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                  color: earned
+                      ? const Color(0xFF18A875)
+                      : const Color(0xFF7B8798),
+                ),
+              ),
+            ],
           ),
         ),
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-        subtitle: Text(description),
-        trailing: earned
-            ? const Icon(Icons.check_circle_rounded)
-            : const Text('Locked'),
       ),
     );
   }
 }
-
 class NotificationCenterScreen extends StatelessWidget {
   const NotificationCenterScreen({super.key});
 
@@ -10663,4 +11051,6 @@ class PlaceholderScreen extends StatelessWidget {
 List<BoxShadow> _softShadow() => const [
       BoxShadow(color: Color(0x1A22446B), blurRadius: 18, offset: Offset(0, 7))
     ];
+
+
 
